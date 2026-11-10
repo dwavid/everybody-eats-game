@@ -1,5 +1,6 @@
 'use strict';
-// Chiptune big-band swing. Loaded before game.js; uses the audio context (`ac`, `muted`) that game.js creates.
+// Chiptune big-band swing, inspired by Cab Calloway's "Everybody Eats When They Come to My House" (the title and level 1 use its
+// chord changes and swing tempo; no melody or arrangement from the song is used). Loaded before game.js; uses the audio context (`ac`, `muted`) that game.js creates.
 //
 // How it works: every track is a chord chart (12-bar blues or 16-bar changes). From the chart we build, once and
 // deterministically (seeded), a walking bass, brass-style chord stabs, drums and a bebop-ish melody that sticks to the
@@ -17,6 +18,7 @@ const PITCH = { C: 0, D: 2, E: 4, F: 5, G: 7, A: 9, B: 11 };
 const ION = [0, 2, 4, 5, 7, 9, 11], MIX = [0, 2, 4, 5, 7, 9, 10], DOR = [0, 2, 3, 5, 7, 9, 10], LOC = [0, 1, 3, 5, 6, 8, 10], DIM = [0, 2, 3, 5, 6, 8, 9, 11];
 const QUALITY = {
   '6': { iv: [0, 4, 7, 9], scale: ION }, maj7: { iv: [0, 4, 7, 11], scale: ION }, '7': { iv: [0, 4, 7, 10], scale: MIX },
+  '9': { iv: [0, 4, 7, 10], scale: MIX }, '13': { iv: [0, 4, 7, 10], scale: MIX }, '13b5': { iv: [0, 4, 6, 10], scale: [0, 2, 4, 6, 8, 10] },
   m7: { iv: [0, 3, 7, 10], scale: DOR }, m6: { iv: [0, 3, 7, 9], scale: DOR }, m7b5: { iv: [0, 3, 6, 10], scale: LOC }, dim7: { iv: [0, 3, 6, 9], scale: DIM },
 };
 function parseChord(tok) {
@@ -34,8 +36,10 @@ function mulberry32(a) { return () => { a |= 0; a = (a + 0x6D2B79F5) | 0; let t 
 // ---------------------------------------------------------------- track definitions
 // bpm, chords, seed, comp (comping style), drums, lead range, blues (adds blue notes), density (how busy the melody is)
 const TRACK_DEFS = {
-  grove: { bpm: 156, seed: 11, comp: 'charleston', drums: 'swing', lo: 67, hi: 86, density: 0.8,
-    prog: 'C6 | A7 | Dm7 G7 | C6 A7 | Dm7 | G7 | C6 Cdim7 | Dm7 G7 | C6 | A7 | Dm7 G7 | C6 A7 | Dm7 G7 | C6 A7 | Dm7 G7 | C6 G7' },
+  // Level 1: the chord changes of "Everybody Eats When They Come to My House" (Cab Calloway), moved to F. Chords and tempo only;
+  // the melody and arrangement are original.
+  grove: { bpm: 152, seed: 19, comp: 'chops', drums: 'swing', lo: 67, hi: 86, density: 0.8,
+    prog: 'F6 Fdim7 | Gm7 C13b5 | Gm7 | Db9 C9 | Db9 C9 | F6 Fdim7 | Gm7 C13b5 | F6 | F6 Fdim7 | Gm7 C13b5 | Gm7 | Db9 C9 | Db9 C9 | F6 D7 | Gm7 C7 | F6 C7' },
   deli: { bpm: 138, seed: 23, comp: 'charleston', drums: 'swing', lo: 65, hi: 84, density: 0.75, blues: true,
     prog: 'F7 | Bb7 | F7 | Cm7 F7 | Bb7 | Bdim7 | F7 | Am7 D7 | Gm7 | C7 | F7 D7 | Gm7 C7' },
   bayou: { bpm: 112, seed: 37, comp: 'sparse', drums: 'brush', lo: 63, hi: 82, density: 0.6, blues: true,
@@ -52,8 +56,9 @@ const TRACK_DEFS = {
     prog: 'Cm7 | Fm7 | Dm7b5 G7 | Cm7 | Cm7 | Fm7 | Dm7b5 G7 | Cm7 G7 | Cm7 | Fm7 | Dm7b5 G7 | Cm7 | Fm7 | Dm7b5 G7 | Cm7 Fm7 | Dm7b5 G7' },
   bossC: { bpm: 188, seed: 97, comp: 'shout', drums: 'drive', lo: 64, hi: 85, density: 0.95, blues: true,
     prog: 'Em7 | Em7 | Am7 | B7 | Em7 | C7 | Am7 B7 | Em7 B7 | Em7 | Em7 | Am7 | B7 | C7 | Am7 | Em7 C7 | B7' },
-  home: { bpm: 98, seed: 5, comp: 'sparse', drums: 'brush', lo: 67, hi: 84, density: 0.5,
-    prog: 'Cmaj7 | Am7 | Dm7 | G7 | Em7 | A7 | Dm7 | G7 | Cmaj7 | Am7 | Dm7 G7 | Cmaj7 A7 | Dm7 | G7 | Cmaj7 Am7 | Dm7 G7' },
+  // The title / cutscene theme: the same changes in the original key of C, at the song's swing tempo of 156.
+  home: { bpm: 156, seed: 5, comp: 'charleston', drums: 'swing', lo: 67, hi: 86, density: 0.75,
+    prog: 'C6 Cdim7 | Dm7 G13b5 | Dm7 | Ab9 G9 | Ab9 G9 | C6 Cdim7 | Dm7 G13b5 | C6 | C6 Cdim7 | Dm7 G13b5 | Dm7 | Ab9 G9 | Ab9 G9 | C6 A7 | Dm7 G7 | C6 G7' },
 };
 
 // ---------------------------------------------------------------- building a track from its chart

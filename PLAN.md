@@ -27,6 +27,7 @@
 - [x] Keyboard and touch controls
 
 ## Ideas backlog
+- [ ] Put the song's changes (or a nod to them) into more level tunes; a short original "Everybody eats!" call-and-response tag for the title screen
 - [ ] More guests (rhyme ideas: Kerry -> cherry, Sue -> stew, Dan -> flan, Pete -> beet, Lou -> ravioli?)
 - [ ] A recipe book screen showing all unlocked foods, and unlocked foods giving Cab new abilities
 - [ ] Level select, saved progress (localStorage)
