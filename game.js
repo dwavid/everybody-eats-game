@@ -665,7 +665,7 @@ function updateScene() {
 }
 
 // ---------- Drawing: characters ----------
-const CAB_PAL = { skin: '#ffd9b3', skin2: '#f0b98c', white: '#ffffff', shade: '#d9dff0', red: '#e24a4a', pants: '#3b4a8a', shoe: '#4a2c1a', dark: '#2a1a22', cheek: '#ff9aa0' };
+const CAB_PAL = { skin: '#8d5a3b', skin2: '#6e4429', white: '#ffffff', shade: '#d9dff0', red: '#e24a4a', pants: '#3b4a8a', shoe: '#4a2c1a', dark: '#1d1018', cheek: '#c96f66' };
 function drawCab(x, y, face, o) { // x = center, y = feet. o: {scale, walk, air, vy, toss, hurt, talk, joy, spin, back}
   o = o || {};
   const s = o.scale || 1;
