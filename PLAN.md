@@ -5,6 +5,7 @@
 **Style:** same as the Boulder game: chunky pixel art drawn in code (no image files), side-scrolling, plain HTML + Canvas + JS, no build step.
 
 ## Done
+- [x] New music: chiptune big-band swing (walking bass, brass-style stabs, swung melodies, drum kit) with its own tune per level, three boss tunes and a gentle home tune; a new engine (`music.js`) with swing timing on the audio clock
 - [x] Levels 4-6: Tomato Garden (Plato -> TOMATO), Cacciatore Woods (Dory -> CACCIATORE) and Baloney Factory (Tony -> BOLOGNA), each with its own world, enemies and boss
 - [x] New mechanics: rolling and hopping enemies, spikes (thorns, bear traps), bounce-pad mushrooms with bonus canopy ledges, conveyor belts, sandwich presses, throwers whose throws leave sauce / fried egg / mustard puddles
 - [x] Bosses: Sir Splatsalot (squash-and-stretch bounces and mini tomatoes), Count Cacciatore (chick waves and a tracked dive-bomb, upside-down when stuck), King Baloney (crown boomerang; dodge his bread so it squashes him)

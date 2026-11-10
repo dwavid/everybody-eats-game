@@ -166,46 +166,7 @@ const sfx = {
   doorbell() { tone(784, 0.5, 'sine', 0.14); tone(587, 0.8, 'sine', 0.14, 0, 0.35); },
 };
 // A tiny step sequencer. Notes are MIDI numbers (60 = middle C), 0 = rest.
-const mtof = (m) => 440 * Math.pow(2, (m - 69) / 12);
-const MUSIC = {
-  grove: { step: 8,
-    lead: [72, 0, 76, 0, 79, 0, 76, 0, 74, 0, 77, 0, 81, 0, 77, 0, 72, 0, 76, 79, 84, 0, 79, 0, 74, 0, 72, 0, 71, 0, 0, 0],
-    bass: [48, 0, 55, 0, 48, 0, 55, 0, 50, 0, 57, 0, 50, 0, 57, 0, 48, 0, 55, 0, 48, 0, 55, 0, 43, 0, 50, 0, 43, 0, 50, 0] },
-  boss: { step: 6,
-    lead: [69, 0, 72, 0, 76, 0, 72, 0, 69, 0, 72, 77, 76, 0, 0, 0, 68, 0, 71, 0, 75, 0, 71, 0, 68, 0, 71, 76, 75, 0, 0, 0],
-    bass: [45, 45, 0, 45, 45, 0, 45, 0, 45, 45, 0, 45, 48, 0, 47, 0, 44, 44, 0, 44, 44, 0, 44, 0, 44, 44, 0, 44, 47, 0, 46, 0] },
-  deli: { step: 7,
-    lead: [76, 0, 79, 76, 81, 0, 79, 0, 77, 0, 81, 77, 83, 0, 81, 0, 76, 79, 83, 0, 81, 79, 77, 0, 74, 0, 77, 74, 76, 0, 0, 0],
-    bass: [45, 0, 52, 0, 45, 0, 52, 0, 41, 0, 48, 0, 41, 0, 48, 0, 45, 0, 52, 0, 45, 0, 52, 0, 40, 0, 47, 0, 40, 0, 47, 0] },
-  bayou: { step: 10,
-    lead: [67, 0, 0, 70, 0, 72, 73, 72, 0, 70, 0, 0, 67, 0, 0, 0, 65, 0, 0, 68, 0, 70, 71, 70, 0, 68, 0, 0, 65, 0, 0, 0],
-    bass: [43, 0, 43, 0, 50, 0, 43, 0, 43, 0, 43, 0, 50, 0, 53, 0, 41, 0, 41, 0, 48, 0, 41, 0, 41, 0, 41, 0, 48, 0, 51, 0] },
-  garden: { step: 8,
-    lead: [72, 0, 74, 76, 79, 0, 76, 0, 77, 0, 76, 74, 72, 0, 0, 0, 74, 0, 76, 77, 81, 0, 79, 0, 77, 0, 76, 74, 76, 0, 0, 0],
-    bass: [48, 0, 55, 0, 48, 0, 55, 0, 53, 0, 60, 0, 53, 0, 60, 0, 50, 0, 57, 0, 50, 0, 57, 0, 43, 0, 50, 0, 43, 0, 50, 0] },
-  woods: { step: 9,
-    lead: [69, 0, 72, 0, 76, 0, 74, 72, 69, 0, 0, 0, 67, 0, 71, 0, 74, 0, 72, 71, 67, 0, 0, 0, 65, 0, 69, 0, 72, 0, 71, 69, 65, 0, 0, 0, 64, 0, 67, 71, 69, 0, 0, 0],
-    bass: [45, 0, 0, 52, 0, 0, 45, 0, 0, 52, 0, 0, 43, 0, 0, 50, 0, 0, 43, 0, 0, 50, 0, 0, 41, 0, 0, 48, 0, 0, 41, 0, 0, 48, 0, 0, 40, 0, 0, 47, 0, 0, 52, 0] },
-  factory: { step: 6,
-    lead: [64, 0, 64, 0, 67, 0, 64, 0, 62, 0, 62, 0, 65, 0, 62, 0, 60, 0, 60, 0, 64, 0, 60, 0, 59, 0, 62, 0, 59, 0, 0, 0],
-    bass: [40, 40, 0, 40, 40, 0, 40, 0, 38, 38, 0, 38, 38, 0, 38, 0, 36, 36, 0, 36, 36, 0, 36, 0, 35, 35, 0, 35, 35, 0, 35, 0] },
-  home: { step: 12,
-    lead: [67, 0, 0, 71, 0, 0, 74, 0, 0, 71, 0, 0, 69, 0, 0, 72, 0, 0, 76, 0, 0, 72, 0, 0],
-    bass: [43, 0, 0, 0, 0, 0, 50, 0, 0, 0, 0, 0, 45, 0, 0, 0, 0, 0, 52, 0, 0, 0, 0, 0] },
-};
-let musicName = null, musicFrame = 0, musicStep = 0;
-function musicTick() {
-  const want = state === 'play' || state === 'dead' ? (boss && boss.active && boss.state !== 'dead' ? 'boss' : LV.music)
-    : (state === 'cutscene' || state === 'title' || state === 'unlock') ? 'home' : null;
-  if (want !== musicName) { musicName = want; musicFrame = 0; musicStep = 0; }
-  if (!want || !ac || muted) return;
-  const m = MUSIC[want];
-  if (musicFrame++ % m.step !== 0) return;
-  const i = musicStep++ % m.lead.length;
-  const l = m.lead[i], b = m.bass[i % m.bass.length];
-  if (l) tone(mtof(l), 0.13, 'square', 0.028);
-  if (b) tone(mtof(b), 0.2, 'triangle', 0.07);
-}
+// Music lives in music.js (a chiptune big-band swing engine); step() calls musicTick() once per frame.
 
 // ---------- Current level ----------
 // LEVELS (levels.js) holds the data for every guest. loadLevel(i) copies the current one into these globals.
