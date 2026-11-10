@@ -5,6 +5,10 @@
 **Style:** same as the Boulder game: chunky pixel art drawn in code (no image files), side-scrolling, plain HTML + Canvas + JS, no build step.
 
 ## Done
+- [x] Levels 4-6: Tomato Garden (Plato -> TOMATO), Cacciatore Woods (Dory -> CACCIATORE) and Baloney Factory (Tony -> BOLOGNA), each with its own world, enemies and boss
+- [x] New mechanics: rolling and hopping enemies, spikes (thorns, bear traps), bounce-pad mushrooms with bonus canopy ledges, conveyor belts, sandwich presses, throwers whose throws leave sauce / fried egg / mustard puddles
+- [x] Bosses: Sir Splatsalot (squash-and-stretch bounces and mini tomatoes), Count Cacciatore (chick waves and a tracked dive-bomb, upside-down when stuck), King Baloney (crown boomerang; dodge his bread so it squashes him)
+- [x] Guests Plato (toga, beard, laurel), Dory (curly puffs, teal dress) and Tony (big quiff, green jersey)
 - [x] Levels 2 and 3 (see below) and a proper `LEVELS` system: guest, food, theme, enemy kinds, layout, boss and dialogue are all data in `levels.js`; the title screen has a level picker (progress saved in localStorage); finishing a level leads straight into the next guest's arrival
 - [x] Level 2: Salami Deli (Tommy -> SALAMI): indoor deli with brick walls, neon sign and shelves; angry salami slices, mice that toss cheese, spinning slicer blades on the floor, oil puddles that make you slide, salamis that drop from their hooks
 - [x] Boss: General Salami. Fires slices at two heights (highs first), then curls up and rolls like a wheel across the arena; when he hits the wall he's dizzy and you stomp his cap. Rolls twice in his last phase

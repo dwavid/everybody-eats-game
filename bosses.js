@@ -374,3 +374,304 @@ BOSSES.gravy = {
     if (b.bubbleT > 0 && b.bubble) bubble(cx, y - 50, b.bubble);
   },
 };
+
+// ================================================================ 4. Sir Splatsalot (tomato)
+// A huge bouncing tomato. He tosses mini tomatoes along the floor (jump or stomp them), and bounces toward you in
+// squash-and-stretch hops, spraying seeds where he lands. After his last bounce he's splatted flat: stomp him.
+function ellipseFill(cx, top, w, h, c1, c2) {
+  for (let r = 0; r < h; r++) {
+    const dy = ((r + 0.5) / h) * 2 - 1, half = Math.round(w / 2 * Math.sqrt(Math.max(0, 1 - dy * dy)));
+    if (half < 1) continue;
+    R(cx - half, top + r, half * 2, 1, c1); if (half > 2) R(cx - half + 1, top + r, half * 2 - 2, 1, c2);
+  }
+}
+BOSSES.tomato = {
+  name: 'SIR SPLATSALOT',
+  tip: 'Jump his bounces. When he is splatted flat, stomp him!',
+  lines: { intro: 'Prepare to be SAUCED!', hit: ["Squish! Now I'm really RED!", "You're making me PASTA-way!"], die: 'Tomato, tomahto... it is all... over...' },
+  colors: ['#e0302a', '#ff9a8a', '#8a1a18'],
+  h: 44, hw: 18, dazed: 130,
+  box: (b) => (b.state === 'dazed' ? { hw: 22, h: 26 } : null),
+  freezeFace: (b) => b.state === 'hop',
+  dangerous: (b) => ['walk', 'toss', 'bounce', 'hop', 'land', 'intro'].includes(b.state),
+  stompable: (b) => ['walk', 'toss', 'dazed'].includes(b.state),
+  step(b, ph, spd, toCab) {
+    switch (b.state) {
+      case 'walk': {
+        const d = Math.abs(cab.x - b.x);
+        b.x += (d > 100 ? toCab : d < 60 ? -toCab : 0) * spd * 0.9;
+        if (b.t > 60 - ph * 10) { b.atk++; b.state = b.atk % 2 ? 'toss' : 'bounce'; b.t = 0; sfx.bossWind(); if (b.state === 'bounce') b.hops = 2 + (ph >= 1 ? 1 : 0); }
+        break;
+      }
+      case 'toss':
+        if (b.t === 38 || (ph >= 1 && b.t === 68)) { b.shots.push({ kind: 'mini', x: b.x + b.face * 20, dir: b.face, sp: 2 + ph * 0.3, rot: 0 }); sfx.toss(); }
+        if (b.t > (ph >= 1 ? 100 : 70)) { b.state = 'walk'; b.t = 0; }
+        break;
+      case 'bounce': // squashing down for the first hop
+        if (b.t === 28) { const air = 46 - ph * 4; b.vy = -(0.5 * TUNE.gravity * air); b.vx = clamp((cab.x - b.x) / air, -3, 3); b.state = 'hop'; b.t = 0; sfx.jump(); }
+        break;
+      case 'hop':
+        b.x += b.vx; b.vy += TUNE.gravity; b.y += b.vy;
+        if (b.y >= GROUND) {
+          b.y = GROUND; b.vy = 0; shake = 8; sfx.bossSlam(); burst(b.x, GROUND - 3, 10, ['#e0302a', '#ff9a8a', '#8a1a18'], 2.2);
+          for (const [vx, vy] of [[-2.2, -3.2], [-1.2, -2.6], [1.2, -2.6], [2.2, -3.2]]) b.shots.push({ kind: 'seed', x: b.x, y: GROUND - 6, vx, vy });
+          if (--b.hops > 0) { b.state = 'land'; b.t = 0; } else { b.state = 'dazed'; b.t = 0; }
+        }
+        break;
+      case 'land': // a quick squash between hops
+        if (b.t > 12) { const air = 46 - ph * 4; b.vy = -(0.5 * TUNE.gravity * air); b.vx = clamp((cab.x - b.x) / air, -3, 3); b.state = 'hop'; b.t = 0; sfx.jump(); }
+        break;
+    }
+  },
+  proj(b) {
+    for (const p of b.shots) {
+      if (p.kind === 'seed') {
+        p.vy += 0.14; p.x += p.vx; p.y += p.vy;
+        if (p.y >= GROUND - 2 || p.x < ARENA.left + 4 || p.x > ARENA.right - 4) p.dead = true;
+        if (!p.dead && Math.abs(p.x - cab.x) < 6 && p.y > cab.y - 24 && p.y < cab.y + 2) { p.dead = true; hitCabIf(true, p.x); }
+      } else { // a mini tomato rolling along the floor; stompable
+        p.x += p.dir * p.sp; p.rot += 0.3 * p.dir;
+        if (p.x < ARENA.left + 8 || p.x > ARENA.right - 8) p.dead = true;
+        if (Math.abs(p.x - cab.x) < 9 && cab.y > GROUND - 15) {
+          if (cab.vy > 0 && cab.y - cab.vy <= GROUND - 9) { p.dead = true; cab.vy = -TUNE.stompBounce; cab.onGround = false; sfx.stomp(); burst(p.x, GROUND - 6, 6, BOSSES.tomato.colors, 1.6); addScore(100, p.x, GROUND - 20); }
+          else if (hitCabIf(true, p.x)) p.dead = true;
+        }
+      }
+    }
+  },
+  drawProj(b) {
+    for (const p of b.shots) {
+      const x = Math.round(p.x), y = Math.round(p.y);
+      if (p.kind === 'seed') { R(x - 1, y - 2, 3, 4, '#f6e0a0'); R(x - 1, y - 2, 1, 4, '#fff6d0'); R(x, y + 1, 1, 1, '#c8a060'); }
+      else { const cy = GROUND - 8; disc(x, cy, 8, '#8a1a18'); disc(x, cy, 7, '#e0302a'); R(x - 5, cy - 6, 3, 1, '#ff9a8a'); R(x + Math.cos(p.rot) * 6 - 1, cy + Math.sin(p.rot) * 6 - 1, 3, 3, '#3aa648'); const fx = x + Math.sign(p.dir); R(fx - 3, cy - 2, 2, 3, '#2a1a22'); R(fx + 2, cy - 2, 2, 3, '#2a1a22'); R(fx - 4, cy - 4, 3, 1, '#2a1a22'); R(fx + 2, cy - 4, 3, 1, '#2a1a22'); }
+    }
+  },
+  draw(b, awake) {
+    let x = Math.round(b.x), y = Math.round(b.y);
+    const f = b.face;
+    const flashing = (b.flash > 0 && frame % 4 < 2) || (b.state === 'dying' && frame % 6 < 3);
+    if (b.state === 'dying') x += Math.round(Math.sin(b.t * 1.8) * 2);
+    let W2 = 36, H2 = 34;
+    if (b.state === 'bounce') { const k = Math.min(1, b.t / 28); W2 = 36 + Math.round(k * 8); H2 = 34 - Math.round(k * 10); }
+    else if (b.state === 'hop') { const s = Math.min(1, Math.abs(b.vy) / 6.5); W2 = 36 - Math.round(s * 5); H2 = 34 + Math.round(s * 6); }
+    else if (b.state === 'land') { W2 = 44; H2 = 26; }
+    else if (b.state === 'dazed') { W2 = 46; H2 = 22; }
+    else if (b.state === 'toss' && b.t < 38) { W2 = 36 + Math.round(b.t / 38 * 4); H2 = 34 + Math.round(b.t / 38 * 3); }
+    if (b.state !== 'hop') R(x - 15, GROUND, 30, 2, 'rgba(0,0,0,.2)'); else R(x - 11, GROUND, 22, 2, 'rgba(0,0,0,.15)');
+    const stepW = b.state === 'walk' ? Math.round(Math.sin(frame * 0.2) * 2) : 0;
+    const top = y - 4 - H2, cy = top + (H2 >> 1);
+    R(x - 9 + stepW, y - 4, 7, 4, '#4a2810'); R(x + 2 - stepW, y - 4, 7, 4, '#4a2810');
+    ellipseFill(x, top, W2, H2, flashing ? '#ffd1d1' : '#8a1a18', flashing ? '#ffffff' : '#e0302a');
+    R(x - (W2 >> 1) + 4, top + 3, 5, 2, '#ff9a8a'); R(x - (W2 >> 1) + 3, top + 5, 2, 3, '#ff9a8a'); // highlight
+    // leafy crown
+    const leaf = flashing ? '#fff' : '#3aa648';
+    R(x - 7, top - 2, 14, 3, leaf); R(x - 4, top - 5, 8, 4, leaf); R(x - 10, top, 5, 2, leaf); R(x + 5, top, 5, 2, leaf); R(x - 1, top - 8, 3, 4, '#2f8a3a');
+    // tiny arms
+    const armUp = b.state === 'toss' && b.t < 38 ? -8 : 0;
+    R(x + f * (W2 / 2 - 1), cy + 2 + armUp, 5, 3, '#c02820'); R(x + f * (W2 / 2 + 3), cy + 3 + armUp, 2, 2, '#e0302a');
+    R(x - f * (W2 / 2 + 3), cy + 3, 5, 3, '#c02820');
+    // face
+    const fx = x + f * 3, fy = cy - 3;
+    if (b.state === 'dazed' || b.state === 'dying') { for (const dx of [-7, 2]) { R(fx + dx, fy, 5, 1, '#2a1a22'); R(fx + dx + 1, fy + 1, 3, 1, '#2a1a22'); R(fx + dx, fy + 2, 5, 1, '#2a1a22'); } R(fx - 3, fy + 8, 7, 2, '#2a1a22'); R(fx - 1, fy + 9, 3, 1, '#ff9a8a'); }
+    else if (b.state === 'hurt') { R(fx - 7, fy, 6, 1, '#2a1a22'); R(fx + 2, fy, 6, 1, '#2a1a22'); R(fx - 4, fy + 6, 8, 4, '#2a1a22'); R(fx - 1, fy + 8, 3, 2, '#ff9a8a'); }
+    else {
+      R(fx - 7, fy, 5, 5, '#fff'); R(fx + 2, fy, 5, 5, '#fff'); R(fx - 5 + f, fy + 1 + (awake ? 0 : 1), 2, 3, '#c11'); R(fx + 4 + f - 2, fy + 1 + (awake ? 0 : 1), 2, 3, '#c11');
+      for (let i = 0; i < 6; i++) { R(fx - 8 + i, fy - 3 + (f > 0 ? i : 5 - i) / 2 | 0, 1, 2, '#2a1a22'); R(fx + 2 + i, fy - 3 + (f > 0 ? 5 - i : i) / 2 | 0, 1, 2, '#2a1a22'); }
+      const open = b.state === 'toss' || b.state === 'intro' || b.state === 'hop';
+      R(fx - 5, fy + 8, 10, open ? 5 : 3, '#2a1a22'); R(fx - 4, fy + 8, 2, 2, '#fff'); R(fx + 2, fy + 8, 2, 2, '#fff'); R(fx - 1, fy + 8, 2, 2, '#fff'); if (open) R(fx - 2, fy + 11, 4, 2, '#e06a6a');
+    }
+    if (b.state === 'dazed') bossStars(x, top - 14);
+    if (b.state === 'toss' && b.t < 38) bossWindMark(x, top - 22);
+    if (b.bubbleT > 0 && b.bubble) bubble(x, top - 22, b.bubble);
+  },
+};
+
+// ================================================================ 5. Count Cacciatore (chicken)
+// A roast chicken in a hunter's hat. He sends baby chicks running at you from both walls (stomp or hop them), then
+// flaps up out of sight while his shadow tracks you, and dive-bombs where it locks. He lands head-first, legs kicking.
+function chickenSprite(b, awake, flipped) { // drawn at the origin with the feet at (0,0), facing +x (the caller scales)
+  const flashing = (b.flash > 0 && frame % 4 < 2) || (b.state === 'dying' && frame % 6 < 3);
+  const gold = flashing ? '#ffffff' : '#d89a4a', dark = flashing ? '#ffd1d1' : '#8a5a20', light = flashing ? '#fff' : '#f0c070';
+  const flap = (b.state === 'flap' || b.state === 'rise') ? Math.round(Math.sin(frame * 0.7) * 6) : 0;
+  const stepW = b.state === 'walk' ? Math.round(Math.sin(frame * 0.2) * 2) : 0;
+  R(-6 + stepW, -9, 2, 7, '#e8902a'); R(3 - stepW, -9, 2, 7, '#e8902a'); R(-9 + stepW, -2, 6, 2, '#e8902a'); R(1 - stepW, -2, 6, 2, '#e8902a'); R(-9 + stepW, -3, 1, 1, '#e8902a'); R(5 - stepW, -3, 1, 1, '#e8902a');
+  R(-19, -34, 7, 14, dark); R(-17, -36, 5, 4, gold); R(-21, -30, 4, 10, gold); R(-19, -22, 7, 3, light); // tail feathers
+  disc(0, -21, 15, dark); disc(0, -21, 14, gold); disc(2, -18, 9, light);
+  R(-8, -29, 5, 2, light); R(-9, -28, 2, 2, light); // highlight
+  for (let i = 0; i < 3; i++) { disc(-6 + i * 6, -14 + i * -4 + 4, 2, '#d03a2a'); R(-7 + i * 6, -15 + i * -4 + 4, 1, 1, '#ff8a7a'); } // sash of pepper rings
+  R(-4, -24 - flap, 9, 7, dark); R(-3, -23 - flap, 7, 5, gold); R(-6, -26 - flap, 5, 4, dark); R(-5, -25 - flap, 3, 2, gold); // wing
+  disc(9, -38, 8, dark); disc(9, -38, 7, gold); R(15, -39, 6, 3, '#ff9a30'); R(15, -37, 5, 1, '#c86a10'); R(13, -34, 3, 4, '#e03030'); // head, beak, wattle
+  R(6, -49, 3, 5, '#e03030'); R(9, -50, 3, 5, '#e03030'); R(12, -48, 3, 4, '#e03030'); // comb
+  if (b.state === 'dazed' || b.state === 'dying') { for (const dx of [5, 11]) { R(dx, -41, 3, 1, '#1d1018'); R(dx + 1, -40, 1, 1, '#1d1018'); R(dx, -39, 3, 1, '#1d1018'); } }
+  else if (b.state === 'hurt') { R(5, -41, 4, 1, '#1d1018'); R(11, -41, 4, 1, '#1d1018'); }
+  else { R(6, -41, 3, 4, '#fff'); R(12, -41, 3, 4, '#fff'); R(7 + 1, -40 + (awake ? 0 : 1), 2, 3 - (awake ? 0 : 1), '#c11'); R(13, -40 + (awake ? 0 : 1), 2, 3 - (awake ? 0 : 1), '#c11'); R(5, -44, 4, 1, '#1d1018'); R(6, -43, 3, 1, '#1d1018'); R(11, -44, 4, 1, '#1d1018'); R(11, -43, 3, 1, '#1d1018'); }
+  // hunter's hat with a feather
+  R(2, -48, 15, 3, '#2f5a2f'); R(4, -55, 11, 8, '#3a6a3a'); R(6, -58, 7, 4, '#3a6a3a'); R(4, -49, 11, 2, '#c8a040'); R(13, -64, 2, 10, '#d03a3a'); R(14, -66, 2, 6, '#f06a6a');
+}
+BOSSES.chicken = {
+  name: 'COUNT CACCIATORE',
+  tip: 'Hop his chicks. When his beak is stuck, stomp him!',
+  lines: { intro: 'Welcome to MY hunting grounds!', hit: ['Cluck! My feathers!', 'Now I am FOWL-tempered!'], die: 'I have been... plucked...' },
+  colors: ['#d89a4a', '#f0c070', '#e03030'],
+  h: 56, hw: 16, dazed: 140,
+  box: (b) => (b.state === 'dive' ? { hw: 14, h: 40 } : b.state === 'dazed' ? { hw: 16, h: 52 } : null),
+  freezeFace: (b) => ['rise', 'track', 'dive'].includes(b.state),
+  dangerous: (b) => ['walk', 'flap', 'dive', 'intro'].includes(b.state),
+  stompable: (b) => ['walk', 'flap', 'dazed'].includes(b.state),
+  spawnChick(side) {
+    if (enemies.filter((e) => e.kind === 'chick' && e.alive).length >= 6) return;
+    enemies.push({ type: 'mini', kind: 'chick', x: side < 0 ? ARENA.left + 18 : ARENA.right - 18, y: GROUND, z: 0, vz: 0, pre: 0, hopCd: 0, a: ARENA.left + 10, b: ARENA.right - 10, dir: -side, alive: true, t: 0, squish: 0, anim: 0 });
+  },
+  step(b, ph, spd, toCab) {
+    switch (b.state) {
+      case 'walk': {
+        const d = Math.abs(cab.x - b.x);
+        b.x += (d > 110 ? toCab : d < 70 ? -toCab : 0) * spd * 0.9;
+        if (b.t > 58 - ph * 8) { b.atk++; b.state = b.atk % 2 ? 'flap' : 'rise'; b.t = 0; sfx.bossWind(); }
+        break;
+      }
+      case 'flap': // flaps his wings and sends in chicks: one from each wall, more as he gets hurt
+        for (let i = 0; i <= ph; i++) if (b.t === 26 + i * 34) { BOSSES.chicken.spawnChick(-1); BOSSES.chicken.spawnChick(1); sfx.monkey(); }
+        if (b.t > 40 + ph * 34) { b.state = 'walk'; b.t = 0; }
+        break;
+      case 'rise':
+        b.y -= 7 + b.t * 0.15;
+        if (b.y < -70) { b.state = 'track'; b.t = 0; b.y = -70; }
+        break;
+      case 'track': // out of sight; his shadow follows you, then locks
+        if (b.t < 56) b.x += (cab.x - b.x) * 0.09; b.x = clamp(b.x, ARENA.left + 24, ARENA.right - 20);
+        if (b.t === 56) sfx.bossWind();
+        if (b.t >= 82) { b.state = 'dive'; b.t = 0; b.vy = 11; }
+        break;
+      case 'dive':
+        b.y += b.vy;
+        if (b.y >= GROUND) { b.y = GROUND; b.vy = 0; b.state = 'dazed'; b.t = 0; shake = 10; sfx.bossSlam(); burst(b.x + 6, GROUND - 2, 12, ['#e8d9b0', '#c9a96b', '#d89a4a'], 2.4); }
+        break;
+    }
+  },
+  proj() {},
+  drawProj(b) { // the shadow that tells you where he'll land
+    if (b.state === 'track' || (b.state === 'rise' && b.y < 20)) {
+      const x = Math.round(b.x), lock = b.state === 'track' && b.t >= 56, k = b.state === 'track' ? Math.min(1, b.t / 56) : 0;
+      const w = 14 - Math.round(k * 4);
+      R(x - w, GROUND - 1, w * 2, 1, lock ? 'rgba(255,40,40,.95)' : 'rgba(0,0,0,.45)'); R(x - w + 3, GROUND - 2, w * 2 - 6, 1, lock ? 'rgba(255,80,80,.6)' : 'rgba(0,0,0,.25)');
+      if (lock && frame % 6 < 3) txtOutline('!', x, GROUND - 24, 10, '#fff', '#c33', 'center');
+    }
+  },
+  draw(b, awake) {
+    if (b.y < -20) return;
+    let x = Math.round(b.x), y = Math.round(b.y);
+    const stuck = b.state === 'dazed' && b.stuck;
+    if (b.state === 'dying') x += Math.round(Math.sin(b.t * 1.8) * 2);
+    if (b.state === 'dive' || b.state === 'rise') R(x - 12, GROUND, 24, 2, 'rgba(0,0,0,.15)'); else R(x - 14, GROUND, 28, 2, 'rgba(0,0,0,.2)');
+    ctx.save();
+    if (b.state === 'dazed') { ctx.translate(x, y - 56); ctx.scale(b.face, -1); } // head first into the ground, legs in the air
+    else { ctx.translate(x, y); ctx.scale(b.face, 1); }
+    chickenSprite(b, awake, b.state === 'dazed');
+    ctx.restore();
+    if (b.state === 'dazed') { for (let i = 0; i < 3; i++) R(x + b.face * 14 + (i - 1) * 4, GROUND - 3 - (frame % 12 > 6 ? 1 : 0), 2, 2, '#c9a96b'); bossStars(x, y - 66); }
+    if (b.state === 'flap' && b.t < 26) bossWindMark(x, y - 74);
+    if (b.bubbleT > 0 && b.bubble) bubble(x, y - 70, b.bubble);
+  },
+};
+
+// ================================================================ 6. King Baloney (bologna)
+// A crowned slice of bologna. He throws his crown like a boomerang along the floor (hop it going out and coming back),
+// and claps two slices of bread in from both walls: dodge them and they squash HIM, and he's flat and dizzy.
+BOSSES.baloney = {
+  name: 'KING BALONEY',
+  tip: 'Dodge his bread so it squishes HIM, then stomp him!',
+  lines: { intro: 'Everything I say is BALONEY!', hit: ['Ow! My casing!', 'Now you have sliced me THIN!'], die: 'This is... all... baloney...' },
+  colors: ['#f0a0a8', '#ffd8dc', '#a83a42'],
+  h: 52, hw: 21, dazed: 150,
+  box: (b) => (b.state === 'dazed' ? { hw: 23, h: 28 } : null),
+  freezeFace: (b) => b.state === 'sandwich' && b.t > 20,
+  dangerous: (b) => ['walk', 'crown', 'sandwich', 'intro'].includes(b.state),
+  stompable: (b) => ['walk', 'crown', 'dazed'].includes(b.state),
+  step(b, ph, spd, toCab) {
+    const cx = (ARENA.left + ARENA.right) / 2;
+    switch (b.state) {
+      case 'walk': {
+        const d = Math.abs(cab.x - b.x);
+        b.x += (d > 120 ? toCab : d < 80 ? -toCab : 0) * spd * 0.8;
+        if (b.t > 56 - ph * 8) { b.atk++; b.state = b.atk % 2 ? 'sandwich' : 'crown'; b.t = 0; sfx.bossWind(); }
+        break;
+      }
+      case 'crown': // throws his crown out along the floor and it comes back
+        if (b.t === 30) { b.shots.push({ kind: 'crown', x: b.x + b.face * 14, dir: b.face, out: true, dist: 0, max: 130 + ph * 20, rot: 0 }); sfx.toss(); }
+        if (b.t > 40 && !b.shots.some((s) => s.kind === 'crown')) { b.state = 'walk'; b.t = 0; }
+        if (b.t > 240) { b.state = 'walk'; b.t = 0; b.shots = b.shots.filter((s) => s.kind !== 'crown'); }
+        break;
+      case 'sandwich': { // he slides to the middle and claps; bread slides in from both walls toward him
+        if (b.t < 40) b.x += (cx - b.x) * 0.12;
+        if (b.t === 44) {
+          const sp = 2 + ph * 0.25;
+          b.shots.push({ kind: 'bread', x: ARENA.left + 14, dir: 1, sp, stuck: false }, { kind: 'bread', x: ARENA.right - 14, dir: -1, sp, stuck: false }); sfx.bossSlam();
+        }
+        if (b.t > 44) {
+          const breads = b.shots.filter((s) => s.kind === 'bread');
+          if (breads.length === 2 && breads.every((s) => s.stuck)) { // both slices reached him: he's squished
+            b.shots = b.shots.filter((s) => s.kind !== 'bread'); b.state = 'dazed'; b.t = 0; shake = 9; sfx.bossSlam(); sfx.ding();
+            burst(b.x, GROUND - 20, 12, ['#f0dca8', '#9a6a30', '#f0a0a8'], 2.4); popup(b.x, GROUND - 60, 'SQUISHED!', '#fff');
+          } else if (b.t > 220) { b.shots = b.shots.filter((s) => s.kind !== 'bread'); b.state = 'walk'; b.t = 0; }
+        }
+        break;
+      }
+    }
+  },
+  proj(b) {
+    for (const p of b.shots) {
+      if (p.kind === 'crown') {
+        p.rot += 0.5;
+        if (p.out) { p.x += p.dir * 3; p.dist += 3; if (p.dist >= p.max || p.x < ARENA.left + 10 || p.x > ARENA.right - 10) p.out = false; }
+        else { const dx = b.x - p.x; p.x += Math.sign(dx) * 3.4; if (Math.abs(dx) < 10) { p.dead = true; sfx.ding(); } }
+        if (!p.dead && Math.abs(p.x - cab.x) < 10 && cab.y > GROUND - 18) hitCabIf(true, p.x);
+      } else if (!p.stuck) { // bread
+        p.x += p.dir * p.sp;
+        if (Math.abs(p.x - b.x) <= BOSSES.baloney.hw + 8) p.stuck = true;
+        else if (Math.abs(p.x - cab.x) < 10 && cab.y > GROUND - 16) hitCabIf(true, p.x);
+      }
+    }
+  },
+  drawProj(b) {
+    for (const p of b.shots) {
+      const x = Math.round(p.x);
+      if (p.kind === 'crown') { ctx.save(); ctx.translate(x, GROUND - 12); ctx.rotate(p.rot); R(-6, -2, 12, 5, '#ffd93b'); R(-6, -5, 3, 3, '#ffd93b'); R(-1, -6, 3, 4, '#ffd93b'); R(3, -5, 3, 3, '#ffd93b'); R(-1, 0, 2, 2, '#e03030'); R(-6, 2, 12, 1, '#c99a14'); ctx.restore(); }
+      else { R(x - 8, GROUND - 16, 16, 16, '#9a6a30'); R(x - 7, GROUND - 15, 14, 14, '#f0dca8'); R(x - 7, GROUND - 15, 14, 2, '#fff2c8'); R(x - 8, GROUND - 17, 5, 2, '#9a6a30'); R(x + 3, GROUND - 17, 5, 2, '#9a6a30'); R(x - 3, GROUND - 9, 1, 1, '#d8c088'); R(x + 2, GROUND - 6, 1, 1, '#d8c088'); }
+    }
+  },
+  draw(b, awake) {
+    let x = Math.round(b.x), y = Math.round(b.y);
+    const f = b.face;
+    const flashing = (b.flash > 0 && frame % 4 < 2) || (b.state === 'dying' && frame % 6 < 3);
+    if (b.state === 'dying') x += Math.round(Math.sin(b.t * 1.8) * 2);
+    const flat = b.state === 'dazed';
+    R(x - 18, GROUND, 36, 2, 'rgba(0,0,0,.2)');
+    const rim = flashing ? '#ffd1d1' : '#a83a42', body = flashing ? '#ffffff' : '#f0a0a8', inner = flashing ? '#fff' : '#f8b4b8';
+    const stepW = b.state === 'walk' ? Math.round(Math.sin(frame * 0.2) * 2) : 0;
+    R(x - 9 + stepW, y - 4, 7, 4, '#4a2c1a'); R(x + 2 - stepW, y - 4, 7, 4, '#4a2c1a');
+    // royal cape behind
+    if (!flat) { ctx.fillStyle = '#7a2a8f'; ctx.beginPath(); ctx.moveTo(x - f * 4, y - 40); ctx.lineTo(x - f * 24, y - 3); ctx.lineTo(x - f * 4, y - 6); ctx.closePath(); ctx.fill(); ctx.fillStyle = '#a04ab8'; ctx.beginPath(); ctx.moveTo(x - f * 4, y - 40); ctx.lineTo(x - f * 15, y - 9); ctx.lineTo(x - f * 4, y - 22); ctx.closePath(); ctx.fill(); }
+    const bw = flat ? 46 : 38, bh = flat ? 20 : 38, top = y - 4 - bh, cy = top + (bh >> 1);
+    ellipseFill(x, top, bw, bh, rim, body);
+    ellipseFill(x, top + 3, bw - 8, bh - 6, body, inner);
+    for (const [dx, dy] of [[-10, -6], [8, -8], [11, 3], [-12, 4], [-2, 9], [3, -13], [-5, -12]]) if (!flat || Math.abs(dy) < 7) R(x + dx, cy + (flat ? dy >> 1 : dy), 2, 2, '#f8e0e0');
+    R(x - 13, top + 3, 5, 1, '#fff'); R(x - 14, top + 4, 2, 2, '#fff');
+    // arms with white gloves
+    R(x + f * (bw / 2 - 2), cy + 4, 5, 3, '#fff'); R(x - f * (bw / 2 + 2), cy + 4, 5, 3, '#fff');
+    // face
+    const fx = x + f * 2, fy = cy - 5;
+    if (b.state === 'dazed' || b.state === 'dying') { for (const dx of [-8, 3]) { R(fx + dx, fy, 5, 1, '#1d1018'); R(fx + dx + 1, fy + 1, 3, 1, '#1d1018'); R(fx + dx, fy + 2, 5, 1, '#1d1018'); } R(fx - 3, fy + 8, 7, 2, '#1d1018'); }
+    else if (b.state === 'hurt') { R(fx - 8, fy, 6, 1, '#1d1018'); R(fx + 3, fy, 6, 1, '#1d1018'); R(fx - 3, fy + 8, 7, 3, '#1d1018'); }
+    else { R(fx - 8, fy, 6, 5, '#fff'); R(fx + 3, fy, 6, 5, '#fff'); R(fx - 6 + f, fy + 1 + (awake ? 0 : 1), 2, 3, '#1d1018'); R(fx + 5 + f, fy + 1 + (awake ? 0 : 1), 2, 3, '#1d1018'); for (let i = 0; i < 6; i++) { R(fx - 9 + i, fy - 3 + (f > 0 ? i : 5 - i) / 2 | 0, 1, 2, '#1d1018'); R(fx + 3 + i, fy - 3 + (f > 0 ? 5 - i : i) / 2 | 0, 1, 2, '#1d1018'); } }
+    if (!flat) { R(fx - 9, fy + 7, 9, 3, '#f0f0f0'); R(fx, fy + 7, 9, 3, '#f0f0f0'); R(fx - 10, fy + 6, 2, 2, '#f0f0f0'); R(fx + 9, fy + 6, 2, 2, '#f0f0f0'); R(fx - 6, fy + 10, 12, 1, '#c8c8c8'); } // big white moustache
+    // the crown (missing while it's flying)
+    const crownOut = b.shots.some((s) => s.kind === 'crown');
+    if (!crownOut) { const cyy = top - 8; R(x - 9, cyy + 4, 18, 5, '#ffd93b'); R(x - 9, cyy, 4, 5, '#ffd93b'); R(x - 2, cyy - 2, 4, 7, '#ffd93b'); R(x + 5, cyy, 4, 5, '#ffd93b'); R(x - 9, cyy + 8, 18, 1, '#c99a14'); R(x - 1, cyy + 5, 2, 2, '#e03030'); R(x - 7, cyy + 5, 2, 2, '#3b6fd9'); R(x + 5, cyy + 5, 2, 2, '#3b6fd9'); }
+    else if (frame % 20 < 10) R(x + 8, top + 2, 1, 4, '#8ad0ff'); // a sweat drop
+    if (b.state === 'dazed') bossStars(x, top - 12);
+    if (b.state === 'sandwich' && b.t < 44) bossWindMark(x, top - 20);
+    if (b.state === 'crown' && b.t < 30) bossWindMark(x, top - 20);
+    if (b.bubbleT > 0 && b.bubble) bubble(x, top - 20, b.bubble);
+  },
+};

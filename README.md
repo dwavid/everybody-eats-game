@@ -7,8 +7,11 @@ You're **Cab**, a cute little chef. Hungry dinner guests arrive one by one, and 
 | 1 | Hannah | Banana | Banana Grove (jungle, monkeys, coconuts, slippery peels) | Baron Von Peel |
 | 2 | Tommy | Salami | Salami Deli (spinning slicers, cheese-throwing mice, oil puddles, falling salamis) | General Salami |
 | 3 | Davey | Gravy | Gravy Bayou (gravy lakes with boats, geysers, hopping gravy blobs, pea-pod shooters) | Captain Gravy |
+| 4 | Plato | Tomato | Tomato Garden (rolling tomatoes, thorn bushes, tomato-lobbing gnomes, a red barn and windmill) | Sir Splatsalot |
+| 5 | Dory | Cacciatore | Cacciatore Woods (autumn forest, bear traps, bouncy mushrooms, egg-throwing hens) | Count Cacciatore |
+| 6 | Tony | Bologna | Baloney Factory (conveyor belts, sandwich presses, angry toast, hopping pickles, mustard bottles) | King Baloney |
 
-**Controls:** Arrow keys / WASD to move, Space / Up to jump (jump on enemies to stomp them), X / Z / K to toss a ladle, Down while on a log or shelf to drop through it, M to mute. On a phone, use the on-screen buttons (the spoon tosses a ladle). Tap or press Space/Enter to advance dialogue. On the title screen, left/right or 1-3 picks a level you've unlocked.
+**Controls:** Arrow keys / WASD to move, Space / Up to jump (jump on enemies to stomp them), X / Z / K to toss a ladle, Down while on a log or shelf to drop through it, M to mute. On a phone, use the on-screen buttons (the spoon tosses a ladle). Tap or press Space/Enter to advance dialogue. On the title screen, left/right or 1-6 picks a level you've unlocked.
 
 **Run locally:** `python3 -m http.server 8000` and open http://localhost:8000
 

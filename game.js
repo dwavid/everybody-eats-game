@@ -16,6 +16,7 @@ const TUNE = {
   gravity: 0.3, fallGravity: 0.42, jump: 6.3, jumpCut: 1.4, maxFall: 7, // falling is heavier than rising; letting go of jump caps the rise speed at jumpCut
   accel: 0.36, airAccel: 0.3, airTurn: 0.5, friction: 0.3, airFriction: 0.14, maxSpeed: 1.9,
   coyote: 6, buffer: 6,
+  springJump: 8, beltSpeed: 0.8, // bounce pads launch you ~107px; conveyor belts push you along
   hearts: 3, invuln: 100,
   stompBounce: 4.4, stompBounceHeld: 6.2,
   slipSpeed: 2.7, slipFrames: 36,
@@ -159,6 +160,7 @@ const sfx = {
   ding2() { tone(988, 0.15, 'sine', 0.1); tone(1319, 0.3, 'sine', 0.1, 0, 0.12); },
   win() { [523, 659, 784, 1047, 784, 1047, 1319].forEach((f, i) => tone(f, 0.22, 'square', 0.08, 0, i * 0.12)); },
   knock() { noise(0.06, 0.25); noise(0.06, 0.25, 0.16); noise(0.06, 0.25, 0.4); },
+  boing() { tone(220, 0.25, 'sine', 0.14, 700); tone(440, 0.2, 'triangle', 0.08, 500, 0.05); },
   rumble() { noise(0.5, 0.12); tone(70, 0.5, 'triangle', 0.14, 20); },
   geyser() { noise(0.4, 0.22); tone(220, 0.5, 'sawtooth', 0.08, 300); },
   doorbell() { tone(784, 0.5, 'sine', 0.14); tone(587, 0.8, 'sine', 0.14, 0, 0.35); },
@@ -178,6 +180,15 @@ const MUSIC = {
   bayou: { step: 10,
     lead: [67, 0, 0, 70, 0, 72, 73, 72, 0, 70, 0, 0, 67, 0, 0, 0, 65, 0, 0, 68, 0, 70, 71, 70, 0, 68, 0, 0, 65, 0, 0, 0],
     bass: [43, 0, 43, 0, 50, 0, 43, 0, 43, 0, 43, 0, 50, 0, 53, 0, 41, 0, 41, 0, 48, 0, 41, 0, 41, 0, 41, 0, 48, 0, 51, 0] },
+  garden: { step: 8,
+    lead: [72, 0, 74, 76, 79, 0, 76, 0, 77, 0, 76, 74, 72, 0, 0, 0, 74, 0, 76, 77, 81, 0, 79, 0, 77, 0, 76, 74, 76, 0, 0, 0],
+    bass: [48, 0, 55, 0, 48, 0, 55, 0, 53, 0, 60, 0, 53, 0, 60, 0, 50, 0, 57, 0, 50, 0, 57, 0, 43, 0, 50, 0, 43, 0, 50, 0] },
+  woods: { step: 9,
+    lead: [69, 0, 72, 0, 76, 0, 74, 72, 69, 0, 0, 0, 67, 0, 71, 0, 74, 0, 72, 71, 67, 0, 0, 0, 65, 0, 69, 0, 72, 0, 71, 69, 65, 0, 0, 0, 64, 0, 67, 71, 69, 0, 0, 0],
+    bass: [45, 0, 0, 52, 0, 0, 45, 0, 0, 52, 0, 0, 43, 0, 0, 50, 0, 0, 43, 0, 0, 50, 0, 0, 41, 0, 0, 48, 0, 0, 41, 0, 0, 48, 0, 0, 40, 0, 0, 47, 0, 0, 52, 0] },
+  factory: { step: 6,
+    lead: [64, 0, 64, 0, 67, 0, 64, 0, 62, 0, 62, 0, 65, 0, 62, 0, 60, 0, 60, 0, 64, 0, 60, 0, 59, 0, 62, 0, 59, 0, 0, 0],
+    bass: [40, 40, 0, 40, 40, 0, 40, 0, 38, 38, 0, 38, 38, 0, 38, 0, 36, 36, 0, 36, 36, 0, 36, 0, 35, 35, 0, 35, 35, 0, 35, 0] },
   home: { step: 12,
     lead: [67, 0, 0, 71, 0, 0, 74, 0, 0, 71, 0, 0, 69, 0, 0, 72, 0, 0, 76, 0, 0, 72, 0, 0],
     bass: [43, 0, 0, 0, 0, 0, 50, 0, 0, 0, 0, 0, 45, 0, 0, 0, 0, 0, 52, 0, 0, 0, 0, 0] },
@@ -199,11 +210,12 @@ function musicTick() {
 // ---------- Current level ----------
 // LEVELS (levels.js) holds the data for every guest. loadLevel(i) copies the current one into these globals.
 let levelIdx = 0, LV = LEVELS[0], BOSS = BOSSES[LV.boss], THEME = THEMES[LV.theme];
-let LEVEL_W, ARENA, PITS, PLATS, BELLS, MINIS, THROWERS, SLICERS, GEYSERS, PUDDLES, DROPS, SIGNS, SEGS, COOKIES, DECOR;
+let LEVEL_W, ARENA, PITS, PLATS, BELLS, MINIS, THROWERS, SLICERS, GEYSERS, SPIKES, SPRINGS, BELTS, PUDDLES, DROPS, SIGNS, SEGS, COOKIES, DECOR;
 function loadLevel(i) {
   levelIdx = i; LV = LEVELS[i]; THEME = THEMES[LV.theme]; BOSS = BOSSES[LV.boss];
   LEVEL_W = LV.width; ARENA = LV.arena; PITS = LV.pits; PLATS = LV.plats; BELLS = LV.bells; MINIS = LV.minis;
   THROWERS = LV.throwers; SLICERS = LV.slicers; GEYSERS = LV.geysers; PUDDLES = LV.puddles; DROPS = LV.drops; SIGNS = LV.signs;
+  SPIKES = LV.spikes || []; SPRINGS = LV.springs || []; BELTS = LV.belts || [];
   SEGS = []; let x = 0;
   for (const [a, b] of PITS) { SEGS.push([x, a]); x = b; }
   SEGS.push([x, LEVEL_W]);
@@ -217,7 +229,7 @@ let camX = 0, camFollow = 0;
 let score = 0, hearts = TUNE.hearts, checkpoint = 40;
 let bossHp = TUNE.bossHp;
 const gotCookies = new Set();
-let cab, enemies, throwers, peels, drops, slicers, geysers, movers, cookies, bells, ladles, thrown, particles, popups, boss;
+let cab, enemies, throwers, peels, drops, slicers, geysers, movers, spikes, springs, belts, cookies, bells, ladles, thrown, particles, popups, boss;
 let item = null; // the golden banana
 let sceneLines = null, sceneIdx = 0, sceneChars = 0, sceneAfter = null, sceneT = 0, sceneKind = 'intro';
 let cardT = 0, deadT = 0, endT = 0, unlockT = 0;
@@ -230,13 +242,16 @@ function newCab(x) {
 }
 function resetRun(x) {
   cab = newCab(x);
-  enemies = MINIS.map(([ex, ey, a, b], i) => ({ type: 'mini', kind: LV.kinds.mini, x: ex, y: ey, z: 0, vz: 0, pre: 0, hopCd: 50 + (ex % 40), a, b, dir: i % 2 ? 1 : -1, alive: true, t: 0, squish: 0, anim: Math.random() * 20 }));
+  enemies = MINIS.map(([ex, ey, a, b, kind], i) => ({ type: 'mini', kind: kind || LV.kinds.mini, roll: 0, x: ex, y: ey, z: 0, vz: 0, pre: 0, hopCd: 50 + (ex % 40), a, b, dir: i % 2 ? 1 : -1, alive: true, t: 0, squish: 0, anim: Math.random() * 20 }));
   throwers = THROWERS.map(([mx, my]) => ({ kind: LV.kinds.thrower, x: mx, y: my, alive: true, cd: 60 + (mx % 60), wind: 0, face: -1, t: 0, squish: 0 }));
   peels = PUDDLES.map((x) => ({ x, y: GROUND, used: 0, ttl: -1 }));
   drops = DROPS.map((x) => ({ x, state: 'hang', t: 0, y: 46, vy: 0 }));
   slicers = SLICERS.map(([sx, a, b], i) => ({ x: sx, a, b, dir: i % 2 ? 1 : -1, rot: 0 }));
   geysers = GEYSERS.map(([gx, ph]) => ({ x: gx, phase: ph / 240, prev: 'idle' }));
   movers = LV.movers.map(([min, max, y, w, sp, ph]) => ({ min, max, y, w, sp, phase: ph, x: min + (max - min) * ph, dir: 1, dx: 0 }));
+  spikes = SPIKES.map(([x, w, kind]) => ({ x, w, kind }));
+  springs = SPRINGS.map((x) => ({ x, sq: 0 }));
+  belts = BELTS.map(([x0, x1, dir]) => ({ x0, x1, dir }));
   cookies = COOKIES.map(([x, y], i) => ({ x, y, got: gotCookies.has(i), i }));
   bells = BELLS.map((x) => ({ x, on: x <= checkpoint && x > 40, ring: 0 }));
   ladles = []; thrown = []; particles = []; popups = [];
@@ -296,7 +311,7 @@ function fallInPit() {
 }
 function respawn() {
   cab.x = checkpoint; cab.y = GROUND; cab.vx = 0; cab.vy = 0; cab.hurt = 90; cab.slip = 0; cab.stun = 0; cab.onGround = true; cab.ride = null;
-  if (boss.active && boss.state !== 'dead') { boss.active = false; boss.state = 'sleep'; boss.wall = 0; boss.x = ARENA.bossX; boss.y = GROUND; boss.shots = []; boss.waves = []; boss.t = 0; boss.hp = bossHp; boss.empty = false; boss.camLock = 0; }
+  if (boss.active && boss.state !== 'dead') { boss.active = false; boss.state = 'sleep'; boss.wall = 0; boss.x = ARENA.bossX; boss.y = GROUND; boss.shots = []; boss.waves = []; boss.t = 0; boss.hp = bossHp; boss.empty = false; boss.camLock = 0; enemies = enemies.filter((e) => e.kind !== 'chick'); }
 }
 function retryAfterDeath() {
   hearts = TUNE.hearts;
@@ -330,12 +345,13 @@ function updateCab() {
     if (input.down && c.onGround && onOneWay()) { c.dropT = 12; c.onGround = false; c.coyote = 0; c.buf = 0; }
     else { c.vy = -T.jump; c.onGround = false; c.ride = null; c.coyote = 0; c.buf = 0; sfx.jump(); }
   }
-  if (!input.jump && c.vy < -T.jumpCut) c.vy = -T.jumpCut; // let go early = short hop
+  if (!input.jump && c.vy < -T.jumpCut && !c.bouncing) c.vy = -T.jumpCut; // let go early = short hop (a bounce-pad launch isn't cut)
   if (c.dropT > 0) c.dropT--;
   c.vy = Math.min(c.vy + (c.vy < 0 ? T.gravity : T.fallGravity), T.maxFall);
 
   // move X (carried along if standing on a boat), then Y, against solids
   if (c.ride) c.x += c.ride.dx;
+  if (c.onGround && c.y === GROUND) for (const bl of belts) if (c.x > bl.x0 && c.x < bl.x1) c.x += bl.dir * T.beltSpeed; // conveyor belts carry him along
   c.x += c.vx;
   let s = hitSolid(c.x - c.w / 2, c.y - c.h, c.w, c.h - 1);
   if (s) { if (c.vx > 0) c.x = s[0] - c.w / 2; else if (c.vx < 0) c.x = s[0] + s[2] + c.w / 2; c.vx = 0; if (c.slip > 0) c.slip = 0; }
@@ -350,6 +366,9 @@ function updateCab() {
     for (const p of PLATS) {
       if (c.x + c.w / 2 > p[0] && c.x - c.w / 2 < p[0] + p[2] && prevY <= p[1] + 1 && c.y >= p[1]) { c.y = p[1]; c.vy = 0; c.onGround = true; break; }
     }
+    if (!c.onGround) for (const sp of springs) { // land on a bouncy mushroom and you're launched
+      if (Math.abs(c.x - sp.x) < 15 && prevY <= GROUND - 11 && c.y >= GROUND - 12) { c.y = GROUND - 12; c.vy = -T.springJump; c.bouncing = true; sp.sq = 16; sfx.boing(); burst(sp.x, GROUND - 12, 6, ['#fff', '#ff9aa8'], 1.6); break; }
+    }
     if (!c.onGround) for (const m of movers) {
       if (c.x + c.w / 2 > m.x && c.x - c.w / 2 < m.x + m.w && prevY <= m.y + 1 && c.y >= m.y) { c.y = m.y; c.vy = 0; c.onGround = true; c.ride = m; break; }
     }
@@ -358,6 +377,7 @@ function updateCab() {
     burst(c.x, c.y, 3, ['#e8d9b0', '#fff'], 0.8, 0.02);
   }
   c.wasGround = c.onGround;
+  if (c.vy >= 0) c.bouncing = false;
   if (c.onGround && Math.abs(c.vx) > 0.2) c.anim += Math.abs(c.vx) * 0.12; else if (c.onGround) c.anim = 0;
   if (c.y > 215 && state === 'play') fallInPit();
 
@@ -373,17 +393,22 @@ function onOneWay() { // standing on a one-way platform (not the ground)?
 }
 
 // ---------- Enemies ----------
+const HOPPERS = ['blob', 'pepper', 'pickle']; // mini kinds that hop at you
 function updateEnemies() {
   for (const e of enemies) {
     if (e.squish > 0) { e.squish--; continue; }
     if (!e.alive) continue;
     e.anim += 0.15;
     let sp = TUNE.miniSpeed;
-    if (e.kind === 'blob') { // gravy blobs squat, then hop toward you when you're close
+    if (HOPPERS.includes(e.kind)) { // gravy blobs, peppers and pickles squat, then hop toward you when you're close
       if (e.z > 0 || e.vz) { e.vz -= 0.22; e.z += e.vz; sp *= 2.2; if (e.z <= 0) { e.z = 0; e.vz = 0; } }
       else if (e.pre > 0) { sp = 0; if (--e.pre === 0) { e.vz = 2.6; e.z = 0.01; if (Math.abs(cab.x - e.x) < 110) e.dir = cab.x < e.x ? -1 : 1; } }
       else if (--e.hopCd <= 0 && Math.abs(cab.x - e.x) < 100) { e.pre = 14; e.hopCd = 90; }
     }
+    else if (e.kind === 'tomato') { // tomatoes roll at you when you come close
+      if (e.roll > 0) { e.roll--; sp = 1.7; e.anim += 0.3; }
+      else if (state === 'play' && Math.abs(cab.x - e.x) < 130 && Math.abs(cab.y - e.y) < 24) { e.dir = cab.x < e.x ? -1 : 1; e.roll = 80; }
+    } else if (e.kind === 'chick') { sp = 1.3; e.dir = cab.x < e.x ? -1 : 1; e.anim += 0.2; }
     e.x += e.dir * sp;
     if (e.x < e.a) { e.x = e.a; e.dir = 1; }
     if (e.x > e.b) { e.x = e.b; e.dir = -1; }
@@ -393,7 +418,7 @@ function updateEnemies() {
     const ey = e.y - e.z;
     if (Math.abs(cab.x - e.x) < 9 && cab.y > ey - 16 && cab.y - cab.h < ey) {
       if (cab.vy > 0 && cab.y - cab.vy <= ey - 11 + 5) { killMini(e); cab.vy = input.jump ? -TUNE.stompBounceHeld : -TUNE.stompBounce; cab.onGround = false; }
-      else hurtCab(e.x);
+      else { hurtCab(e.x); if (e.kind === 'chick') { e.alive = false; e.squish = 18; } }
     }
   }
 }
@@ -403,7 +428,6 @@ function killMini(e, byLadle) {
   addScore(100, e.x, e.y - 22);
   if (!byLadle) shake = 2;
 }
-const THROWN_COLORS = { monkey: ['#ffd93b', '#ffe97a', '#c99a14'], mouse: ['#ffd23a', '#ffe97a', '#c99a14'], pod: ['#2f8f3a', '#6fd05a', '#c8f5a0'] };
 function updateThrowers() {
   for (const m of throwers) {
     if (m.squish > 0) { m.squish--; continue; }
@@ -431,7 +455,7 @@ function updateThrowers() {
     if (state === 'play' && Math.abs(b.x - cab.x) < 8 && b.y > cab.y - 24 && b.y < cab.y + 2) { b.dead = true; hurtCab(b.x); burst(b.x, b.y, 5, THROWN_COLORS[b.kind], 1.4); }
     else if (b.y >= GROUND - 3 && supportAt(b.x, GROUND)) {
       b.dead = true;
-      if (b.kind === 'monkey') peels.push({ x: Math.round(b.x), y: GROUND, used: 0, ttl: 420 }); // a thrown banana leaves a slippery peel
+      if (THROWER_PUDDLE[b.kind]) peels.push({ x: Math.round(b.x), y: GROUND, used: 0, ttl: 420 }); // what's thrown leaves a slippery puddle
       else burst(b.x, GROUND - 3, 6, THROWN_COLORS[b.kind], 1.4);
     }
     else if (b.y > 220) b.dead = true;
@@ -488,11 +512,16 @@ function updateSlicers() { // spinning deli blades: deadly, just hop over them
     if (state === 'play' && Math.abs(cab.x - s.x) < 11 && cab.y > GROUND - 15) hurtCab(s.x);
   }
 }
+function updateSpikes() { // thorn bushes and bear traps: deadly, hop over them
+  for (const sp of spikes) if (state === 'play' && Math.abs(cab.x - sp.x) < sp.w / 2 + 3 && cab.y > GROUND - 11) hurtCab(sp.x);
+  for (const sp of springs) if (sp.sq > 0) sp.sq--;
+}
 function updateGeysers() { // gravy geysers: bubble (warning), then erupt in a tall column you wait out
   for (const g of geysers) {
     const st = geyserState(g);
     if (st !== g.prev) { if (st === 'warn' && Math.abs(cab.x - g.x) < 200) sfx.rumble(); if (st === 'on' && Math.abs(cab.x - g.x) < 200) sfx.geyser(); g.prev = st; }
-    if (state === 'play' && st === 'on' && Math.abs(cab.x - g.x) < 9 && cab.y > GROUND - GEYSER_TOP) hurtCab(g.x);
+    const def = GEYSER_DEF[LV.kinds.geyser || 'gravy'];
+    if (state === 'play' && st === 'on' && Math.abs(cab.x - g.x) < def.hw && cab.y > GROUND - def.h) hurtCab(g.x);
   }
 }
 function updateCookies() {
@@ -519,7 +548,8 @@ function updateLadles() {
     if (hitSolid(l.x - 2, l.y - 2, 4, 4)) { l.dead = true; burst(l.x, l.y, 3, ['#ccc', '#fff'], 1); sfx.ding(); continue; }
     for (const e of enemies) if (e.alive && Math.abs(l.x - e.x) < 9 && l.y > e.y - e.z - 18 && l.y < e.y - e.z) { killMini(e, true); l.dead = true; }
     for (const m of throwers) if (m.alive && Math.abs(l.x - m.x) < 9 && l.y > m.y - 18 && l.y < m.y) { killThrower(m); l.dead = true; }
-    if (boss.active && boss.state !== 'dead' && Math.abs(l.x - boss.x) < BOSS.hw && l.y > boss.y - BOSS.h && l.y < boss.y) {
+    for (const p of boss.shots) if (p.kind === 'mini' && Math.abs(l.x - p.x) < 9 && l.y > GROUND - 18) { p.dead = true; l.dead = true; burst(p.x, GROUND - 6, 6, BOSS.colors, 1.6); addScore(100, p.x, GROUND - 20); sfx.stomp(); }
+    if (!l.dead && boss.active && boss.state !== 'dead' && Math.abs(l.x - boss.x) < BOSS.hw && l.y > boss.y - BOSS.h && l.y < boss.y) {
       l.dead = true; sfx.ding(); burst(l.x, l.y, 4, ['#fff', '#ddd'], 1.4); popup(l.x, l.y - 12, 'DING!', '#fff');
     }
   }
@@ -585,7 +615,7 @@ function updateBoss() {
       cab.vy = -TUNE.stompBounceHeld; cab.onGround = false; cab.hurt = Math.max(cab.hurt, 20);
       burst(b.x, top, 10, def.colors, 2.4);
       addScore(500, b.x, top - 10);
-      b.shots = []; b.waves = [];
+      b.shots = []; b.waves = []; enemies = enemies.filter((e) => e.kind !== 'chick');
       if (b.hp <= 0) { b.state = 'dying'; say(def.lines.die, 110); }
       else { b.state = 'hurt'; say(def.lines.hit[2 - b.hp] || 'Ow!', 80); }
     } else if (cab.y > top + head && def.dangerous(b)) hurtCab(b.x);
@@ -596,7 +626,7 @@ function updateBoss() {
 function updatePlay() {
   updateMovers();
   updateCab();
-  updateEnemies(); updateThrowers(); updatePeels(); updateDrops(); updateSlicers(); updateGeysers();
+  updateEnemies(); updateThrowers(); updatePeels(); updateDrops(); updateSlicers(); updateGeysers(); updateSpikes();
   updateCookies(); updateBells(); updateLadles(); updateBoss();
   // golden food drop (the boss's reward)
   if (item) {
@@ -773,9 +803,61 @@ function drawPerson(P, x, y, face, o) {
   if (P.tie) { R(-2, -14, 2, 2, P.tie); R(1, -14, 2, 2, P.tie); R(0, -14, 1, 2, '#8a2020'); }
   ctx.restore();
 }
+// ---- Plato (toga, beard, laurel wreath), Dory (curly puffs, teal dress) and Tony (big quiff, green jersey)
+function guestFace(P, hy, o, brow) {
+  const blink = (Math.floor(frame / 105) % 3 === 1 && frame % 105 < 6);
+  if (blink) { R(0, hy - 1, 2, 1, P.dark); R(3, hy - 1, 2, 1, P.dark); }
+  else { R(0, hy - 2, 2, 3, P.dark); R(3, hy - 2, 2, 3, P.dark); R(0, hy - 2, 1, 1, '#fff'); R(3, hy - 2, 1, 1, '#fff'); }
+  if (brow) { R(0, hy - 4, 2, 1, brow); R(3, hy - 4, 2, 1, brow); }
+}
+function drawStyledGuest(look, x, y, face, o) {
+  o = o || {};
+  const s = o.scale || 1, hy = -18, w = Math.sin(o.walk || 0), la = Math.round(w * 2);
+  const talk = o.talk && Math.floor(frame / 6) % 2;
+  ctx.save(); ctx.translate(Math.round(x), Math.round(y)); ctx.scale(face * s, s);
+  if (look === 'plato') {
+    const skin = '#f0cfa8', skin2 = '#d8a878', toga = '#f6f0e0', shade = '#d8d0b8', trim = '#c8a040', gray = '#e8e8f0', laurel = '#4aa04a', dark = '#2a1a22';
+    R(-3 + la, -6, 2, 5, skin); R(1 - la, -6, 2, 5, skin); R(-4 + la, -2, 4, 2, '#8a5a2a'); R(1 - la, -2, 4, 2, '#8a5a2a');
+    R(-5, -15, 10, 10, toga); R(-5, -6, 10, 1, shade); R(-5, -5, 10, 1, trim); R(-5, -13, 10, 1, trim); R(-1, -12, 1, 6, shade); // toga with gold trim
+    R(-7, -13, 2, 5, toga); R(-7, -8, 2, 2, skin); R(5, -13, 2, 5, skin); R(5, -8, 2, 2, skin);
+    disc(0, hy, 5, skin); R(-4, hy + 4, 7, 1, skin2);
+    R(-6, hy - 3, 2, 7, gray); R(4, hy - 3, 2, 7, gray); R(-5, hy - 4, 10, 1, gray); // hair
+    R(-4, hy + 3, 8, 4, gray); R(-3, hy + 7, 6, 2, gray); R(-2, hy + 9, 4, 1, gray); // long beard
+    R(-5, hy - 5, 10, 1, laurel); for (const lx of [-5, -2, 1, 4]) { R(lx, hy - 6, 2, 1, laurel); } // laurel wreath
+    guestFace({ dark }, hy, o, gray);
+    R(-1, hy + 1, 2, 1, '#e8a090'); R(4, hy + 1, 2, 1, '#e8a090');
+    if (talk) R(1, hy + 3, 4, 2, dark); else R(1, hy + 3, 4, 1, dark);
+  } else if (look === 'dory') {
+    const skin = '#c98f66', skin2 = '#a87450', hair = '#2a1a22', hair2 = '#4a3040', dress = '#1aa8a0', dress2 = '#0e7e78', dark = '#2a1a22', gold = '#ffd23a';
+    R(-3 + la, -6, 2, 5, skin); R(1 - la, -6, 2, 5, skin); R(-4 + la, -2, 4, 2, '#e8e0d0'); R(1 - la, -2, 4, 2, '#e8e0d0');
+    R(-5, -15, 10, 6, dress); R(-6, -10, 12, 5, dress); R(-6, -6, 12, 1, dress2); R(-3, -15, 6, 1, '#fff'); R(1, -12, 2, 2, gold); R(3, -12, 1, 1, gold); // dress with a little fish pin
+    R(-7, -13, 2, 5, skin); R(-7, -8, 2, 2, skin); R(5, -13, 2, 5, skin); R(5, -8, 2, 2, skin);
+    disc(0, hy, 5, skin); R(-4, hy + 4, 7, 1, skin2);
+    disc(-6, hy - 2, 3, hair); disc(5, hy - 2, 3, hair); disc(0, hy - 6, 5, hair); R(-5, hy - 4, 10, 3, hair); R(-4, hy - 8, 3, 1, hair2); R(1, hy - 9, 3, 1, hair2); // curly puffs
+    R(-6, hy - 4, 11, 1, '#3b8fd9'); // blue headband
+    R(-6, hy + 3, 1, 2, gold); R(5, hy + 3, 1, 2, gold); // earrings
+    guestFace({ dark }, hy, o);
+    R(-1, hy - 3, 1, 1, dark); R(5, hy - 3, 1, 1, dark); // lashes
+    R(-1, hy + 1, 2, 1, '#ff9aa0'); R(4, hy + 1, 2, 1, '#ff9aa0');
+    if (talk) R(1, hy + 2, 4, 3, dark); else { R(1, hy + 3, 4, 1, dark); R(0, hy + 2, 1, 1, dark); R(5, hy + 2, 1, 1, dark); }
+  } else { // tony
+    const skin = '#e0b088', skin2 = '#c08a60', hair = '#1d1018', hair2 = '#3a2430', green = '#3aa648', dark = '#2a1a22', gold = '#ffd23a';
+    R(-3 + la, -7, 2, 4, '#fff'); R(1 - la, -7, 2, 4, '#fff'); R(-4 + la, -3, 4, 1, skin); R(-4 + la, -2, 5, 2, '#fff'); R(1 - la, -2, 5, 2, '#fff'); R(-3 + la, -3, 2, 1, skin); R(1 - la, -3, 2, 1, skin);
+    R(-4, -9, 8, 3, '#f4efe0'); R(-5, -15, 10, 7, green); R(-5, -15, 10, 1, '#fff'); R(-5, -9, 10, 1, '#fff'); R(0, -13, 3, 1, '#fff'); R(2, -12, 1, 4, '#fff'); // jersey with a number 7
+    R(-7, -14, 2, 2, green); R(-7, -12, 2, 4, skin); R(-7, -8, 2, 1, skin2); R(5, -14, 2, 2, green); R(5, -12, 2, 4, skin); R(5, -8, 2, 1, skin2);
+    R(-2, -15, 5, 1, gold); // gold chain
+    disc(0, hy, 5, skin); R(-4, hy + 4, 7, 1, skin2);
+    R(-5, hy - 5, 10, 3, hair); R(-4, hy - 8, 9, 4, hair); R(0, hy - 10, 6, 3, hair); R(3, hy - 11, 3, 2, hair2); R(-6, hy - 3, 1, 4, hair); R(5, hy - 3, 1, 4, hair); // quiff and sideburns
+    guestFace({ dark }, hy, o, hair);
+    R(-1, hy + 1, 2, 1, '#e8908a'); R(4, hy + 1, 2, 1, '#e8908a');
+    if (talk) R(1, hy + 2, 4, 3, dark); else { R(1, hy + 3, 4, 1, dark); R(5, hy + 2, 1, 1, dark); }
+  }
+  ctx.restore();
+}
 function drawGuest(look, x, y, face, o) {
   if (look === 'tommy') drawPerson(TOMMY, x, y, face, o);
   else if (look === 'davey') drawPerson(DAVEY, x, y, face, o);
+  else if (look === 'plato' || look === 'dory' || look === 'tony') drawStyledGuest(look, x, y, face, o);
   else drawHannah(x, y, face, o);
 }
 
@@ -859,11 +941,14 @@ function drawWorld() {
   for (const d of DECOR) if (d.x > cx - 40 && d.x < cx + W + 40) THEME.decor(d);
   for (const [a, b] of SEGS) THEME.ground(a, b);
   for (const p of PLATS) if (p[0] + p[2] > cx - 10 && p[0] < cx + W + 10) THEME.plat(p);
+  for (const bl of belts) drawBelt(bl);
   for (const m of movers) drawBoat(m);
   drawArenaDecor();
   for (const [x, t] of SIGNS) if (Math.abs(x - cx - 160) < 220) drawSign(x, t);
   for (const g of geysers) if (Math.abs(g.x - cx - 160) < 200) drawGeyser(g);
   for (const s of slicers) drawSlicer(s);
+  for (const sp of spikes) drawSpikes(sp);
+  for (const sp of springs) drawSpring(sp);
   const dropArt = DROP_ART[LV.kinds.drop];
   for (const k of drops) dropArt(k);
   for (const b of bells) drawBell(b);
@@ -967,7 +1052,7 @@ function drawTitle() {
   txtOutline('EVERYBODY', W / 2, 18 + bob / 2, 26, '#ffd93b', '#5a2a12', 'center');
   txtOutline('EATS!', W / 2, 46 + bob / 2, 30, '#ff6b8a', '#5a1230', 'center');
   drawCab(70, GROUND - bob, 1, { scale: 2, joy: bob > 2, air: bob > 0, vy: -1 });
-  for (let i = 0; i < 3; i++) foodSprite(LEVELS[i].food.icon, 244 + i * 22, GROUND - 14 - (i === 1 ? 6 : 0));
+  for (let i = 0; i < LEVELS.length; i++) foodSprite(LEVELS[i].food.icon, 232 + i * 13, GROUND - 13 - (i % 2 ? 5 : 0));
   if (frame % 60 < 40) txtOutline(IS_TOUCH ? 'TAP TO START' : 'PRESS SPACE TO START', 176, 96, 9, '#fff', '#3a2410', 'center');
   txt('Cab the chef must feed', 176, 112, 6, '#fff', 'center');
   txt('every hungry dinner guest!', 176, 121, 6, '#fff', 'center');
@@ -1123,7 +1208,7 @@ window.__game = {
   get state() { return state; }, set state(v) { state = v; },
   get cab() { return cab; }, get boss() { return boss; }, get hearts() { return hearts; }, set hearts(v) { hearts = v; },
   get score() { return score; }, get enemies() { return enemies; }, get throwers() { return throwers; }, get peels() { return peels; },
-  get slicers() { return slicers; }, get geysers() { return geysers; }, get movers() { return movers; }, get drops() { return drops; },
+  get slicers() { return slicers; }, get spikes() { return spikes; }, get springs() { return springs; }, get belts() { return belts; }, get geysers() { return geysers; }, get movers() { return movers; }, get drops() { return drops; },
   get checkpoint() { return checkpoint; }, get camX() { return camX; }, get item() { return item; },
   get LV() { return LV; }, get levelIdx() { return levelIdx; }, get PITS() { return PITS; }, get PLATS() { return PLATS; }, get ARENA() { return ARENA; }, get LEVEL_W() { return LEVEL_W; },
   input, setInput, step, draw, startLevel, resetRun, loadLevel, TUNE, LEVELS, frame: () => frame,

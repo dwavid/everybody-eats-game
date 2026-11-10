@@ -216,20 +216,26 @@ function drawPod(m) { // a pea pod that spits peas
   if (wind) { R(x - 2 + f * 2, y - 12, 4, 3, '#1d1018'); R(x - 1 + f * 2, y - 10, 2, 1, '#e06a6a'); } else R(x - 2 + f, y - 11, 4, 1, '#1d1018');
 }
 function drawPea(x, y) { disc(x, y, 3, '#2f8f3a'); disc(x, y, 2, '#6fd05a'); R(x - 1, y - 1, 1, 1, '#d8ffb8'); }
-function drawThrown(kind, b) { // kind: 'monkey' | 'mouse' | 'pod' -> what they throw
-  if (kind === 'monkey') drawPeel(b.x, b.y, b.rot, false);
-  else if (kind === 'mouse') drawCheese(b.x, b.y, b.rot);
-  else drawPea(Math.round(b.x), Math.round(b.y));
-}
+const THROWN_ART = { // what each kind of thrower throws (levels 4-6 add theirs in themes2.js)
+  monkey: (b) => drawPeel(b.x, b.y, b.rot, false),
+  mouse: (b) => drawCheese(b.x, b.y, b.rot),
+  pod: (b) => drawPea(Math.round(b.x), Math.round(b.y)),
+};
+function drawThrown(kind, b) { THROWN_ART[kind](b); }
 const THROWER_ART = { monkey: drawMonkey, mouse: drawMouse, pod: drawPod };
 const MINI_ART = { banana: drawMiniBanana, salami: drawMiniSalami, blob: drawMiniBlob };
 const MINI_COLORS = { banana: ['#ffd93b', '#ffe97a', '#c99a14'], salami: ['#c0443a', '#f3cdbd', '#7e2420'], blob: ['#7a4418', '#b0702a', '#4a2810'] };
+const THROWN_COLORS = { monkey: ['#ffd93b', '#ffe97a', '#c99a14'], mouse: ['#ffd23a', '#ffe97a', '#c99a14'], pod: ['#2f8f3a', '#6fd05a', '#c8f5a0'] };
+const THROWER_PUDDLE = { monkey: 1 }; // throwers whose throw leaves a slippery puddle where it lands
 const THROWER_COLORS = { monkey: ['#8a5a2b', '#c9894a', '#f1c9a0'], mouse: ['#9aa0ad', '#d8dce6', '#e9a7b4'], pod: ['#2f8f3a', '#4ab85a', '#8fe06a'] };
 
 function drawPuddle(kind, x) { // slippery puddles (touch one and Cab slides)
   const y = GROUND;
   if (kind === 'peel') { drawPeel(x, y - 2, undefined, false); return; }
   if (kind === 'oil') { R(x - 10, y - 2, 20, 2, '#d9a826'); R(x - 7, y - 3, 14, 1, '#f0c840'); R(x - 4, y - 3, 3, 1, '#fff2a0'); R(x - 11, y - 1, 22, 1, '#b8841a'); return; }
+  if (kind === 'sauce') { R(x - 11, y - 2, 22, 2, '#b8241e'); R(x - 8, y - 3, 16, 1, '#e0402e'); R(x - 5, y - 3, 3, 1, '#ff8a7a'); R(x + 2, y - 4, 2, 1, '#e0402e'); R(x - 12, y - 1, 24, 1, '#7a1410'); return; }
+  if (kind === 'egg') { R(x - 11, y - 2, 22, 2, '#fff8ea'); R(x - 9, y - 3, 18, 1, '#ffffff'); disc(x, y - 3, 3, '#ffc830'); R(x - 1, y - 5, 1, 1, '#fff2a0'); R(x - 12, y - 1, 24, 1, '#d8c8a0'); return; }
+  if (kind === 'mustard') { R(x - 11, y - 2, 22, 2, '#e0b010'); R(x - 8, y - 3, 16, 1, '#ffd820'); R(x - 5, y - 3, 3, 1, '#fff08a'); R(x + 3, y - 4, 2, 1, '#e0b010'); R(x - 12, y - 1, 24, 1, '#a08008'); return; }
   R(x - 11, y - 2, 22, 2, '#6b3a14'); R(x - 8, y - 3, 16, 1, '#8a4f22'); R(x - 5, y - 3, 4, 1, '#c88a48'); R(x + 3, y - 4, 2, 1, '#8a4f22'); R(x - 12, y - 1, 24, 1, '#4a2810');
 }
 function drawDropHook(k) { // a salami hanging from the ceiling beam by a rope; the rope snaps when you walk under
@@ -264,7 +270,8 @@ function drawSlicer(s) { // a spinning deli-slicer blade rolling back and forth 
 }
 function geyserState(g) { const t = (frame + g.phase * 240) % 240; return t < 110 ? 'idle' : t < 160 ? 'warn' : t < 220 ? 'on' : 'idle'; }
 const GEYSER_TOP = 84;
-function drawGeyser(g) {
+const GEYSER_DEF = { gravy: { hw: 9, h: 84 }, press: { hw: 14, h: 22 } }; // deadly column: half-width, height (levels pick one with kinds.geyser)
+function drawGeyserGravy(g) {
   const st = geyserState(g), x = Math.round(g.x), t = (frame + g.phase * 240) % 240;
   R(x - 9, GROUND - 3, 18, 3, '#4a2810'); R(x - 6, GROUND - 4, 12, 1, '#6b3a14');
   if (st === 'idle') { if (t % 40 < 8) { R(x - 2, GROUND - 6, 2, 2, '#8a5a30'); R(x + 1, GROUND - 7, 1, 1, '#c88a48'); } return; }
