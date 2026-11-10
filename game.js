@@ -226,7 +226,7 @@ try { progress = clamp(+localStorage.getItem('ee-progress') || 0, 0, LEVELS.leng
 function saveProgress(p) { progress = Math.max(progress, p); try { localStorage.setItem('ee-progress', String(progress)); } catch (e) { /* ignore */ } }
 
 function newCab(x) {
-  return { x, y: GROUND, vx: 0, vy: 0, face: 1, onGround: true, coyote: 0, buf: 0, hurt: 0, stun: 0, slip: 0, slipDir: 1, anim: 0, tossT: 0, ladleCd: 0, dropT: 0, spin: 0, ride: null, w: 10, h: 22 };
+  return { x, y: GROUND, vx: 0, vy: 0, face: 1, onGround: true, coyote: 0, buf: 0, hurt: 0, stun: 0, slip: 0, slipDir: 1, anim: 0, tossT: 0, ladleCd: 0, dropT: 0, ride: null, w: 10, h: 22 };
 }
 function resetRun(x) {
   cab = newCab(x);
@@ -314,7 +314,8 @@ function updateCab() {
   if (c.stun > 0) c.stun--;
   const dir = (input.right ? 1 : 0) - (input.left ? 1 : 0);
   if (c.slip > 0) {
-    c.slip--; c.vx = c.slipDir * T.slipSpeed * (0.55 + 0.45 * (c.slip / T.slipFrames)); c.spin += 0.5;
+    c.slip--; c.vx = c.slipDir * T.slipSpeed * (0.55 + 0.45 * (c.slip / T.slipFrames));
+    if (c.slip % 3 === 0) particles.push({ x: c.x - c.slipDir * 5, y: c.y - 1, vx: -c.slipDir * 0.5, vy: -0.4, life: 14, c: '#e8d9b0', g: 0, s: 2 });
   } else if (c.stun <= 0) {
     const a = c.onGround ? T.accel : (dir && c.vx * dir < 0 ? T.airTurn : T.airAccel); // turning around in the air is quicker
     if (dir) { c.vx += dir * a; c.face = dir; }
@@ -446,7 +447,7 @@ function updatePeels() {
     if (p.ttl > 0 && --p.ttl === 0) p.gone = true;
     if (p.used > 0) p.used--;
     if (state === 'play' && !p.gone && p.used === 0 && cab.slip <= 0 && cab.onGround && cab.y === GROUND && Math.abs(cab.x - p.x) < 9) {
-      cab.slip = TUNE.slipFrames; cab.slipDir = cab.face; cab.vy = -2.2; cab.onGround = false; p.used = 90; sfx.slip();
+      cab.slip = TUNE.slipFrames; cab.slipDir = cab.face; p.used = 90; sfx.slip();
     }
   }
   peels = peels.filter((p) => !p.gone);
@@ -649,24 +650,37 @@ function updateScene() {
 
 // ---------- Drawing: characters ----------
 const CAB_PAL = { skin: '#8d5a3b', skin2: '#6e4429', white: '#ffffff', shade: '#d9dff0', red: '#e24a4a', pants: '#3b4a8a', shoe: '#4a2c1a', dark: '#1d1018', cheek: '#c96f66' };
-function drawCab(x, y, face, o) { // x = center, y = feet. o: {scale, walk, air, vy, toss, hurt, talk, joy, spin, back}
+function drawCab(x, y, face, o) { // x = center, y = feet. o: {scale, walk, air, vy, toss, hurt, talk, joy, slip (frames since slipping began), back}
   o = o || {};
   const s = o.scale || 1;
   ctx.save(); ctx.translate(Math.round(x), Math.round(y)); ctx.scale(face * s, s);
   const P = CAB_PAL;
   const w = Math.sin(o.walk || 0);
-  const bob = o.air ? 0 : (o.walk ? Math.abs(w) > 0.5 ? 1 : 0 : 0);
-  if (o.spin) { ctx.rotate(o.spin); ctx.translate(0, -10); }
+  const sl = o.slip || 0; // sliding on a peel: feet shoot forward, body leans back and rocks, arms windmill
+  const bob = sl ? 0 : o.air ? 0 : (o.walk ? Math.abs(w) > 0.5 ? 1 : 0 : 0);
   // legs
   const la = o.air ? 0 : Math.round(w * 2), lb = o.air ? 1 : -Math.round(w * 2);
-  R(-4 + la, -6, 3, 4, P.pants); R(1 + lb, -6, 3, 4, P.pants);
-  R(-5 + la, -2, 5, 2, P.shoe); R(1 + lb, -2, 5, 2, P.shoe);
+  if (sl) {
+    const kick = (sl % 10 < 5) ? 1 : 0; // the front foot keeps skidding
+    R(-2, -6, 3, 4, P.pants); R(2, -6, 4, 3, P.pants); // legs: one trailing, one stretched out front
+    R(-7, -2, 5, 2, P.shoe); R(5 + kick, -3, 5, 2, P.shoe); R(8 + kick, -5, 2, 2, P.shoe);
+  } else {
+    R(-4 + la, -6, 3, 4, P.pants); R(1 + lb, -6, 3, 4, P.pants);
+    R(-5 + la, -2, 5, 2, P.shoe); R(1 + lb, -2, 5, 2, P.shoe);
+  }
+  if (sl) ctx.translate(-3 + Math.round(Math.sin(sl * 0.5) * 1.5), 0); // upper body leans back, rocking as he tries to catch his balance
   // jacket
   R(-5, -13 - bob, 10, 8 + bob, P.white); R(-5, -6, 10, 1, P.shade); R(-5, -13 - bob, 1, 8 + bob, P.shade);
   R(2, -11 - bob, 1, 1, P.dark); R(2, -8 - bob, 1, 1, P.dark);
   R(-3, -14 - bob, 6, 2, P.red); // neckerchief
   // arms
-  if (o.joy || o.air && (o.vy || 0) < 0) { R(-7, -19 - bob, 2, 6, P.white); R(-7, -21 - bob, 2, 2, P.skin); R(5, -19 - bob, 2, 6, P.white); R(5, -21 - bob, 2, 2, P.skin); }
+  if (sl) { // arms flail: windmilling up, out and down
+    const p = Math.floor(sl / 3) % 4;
+    const up = (xx) => { R(xx, -20, 2, 6, P.white); R(xx, -22, 2, 2, P.skin); };
+    const out = (xx, dir) => { R(dir > 0 ? xx : xx - 3, -14, 5, 2, P.white); R(dir > 0 ? xx + 5 : xx - 5, -14, 2, 2, P.skin); };
+    const down = (xx) => { R(xx, -11, 2, 4, P.white); R(xx, -8, 2, 2, P.skin); };
+    if (p === 0) { up(-7); out(5, 1); } else if (p === 1) { up(-7); up(5); } else if (p === 2) { out(-5, -1); up(5); } else { out(-5, -1); out(5, 1); }
+  } else if (o.joy || o.air && (o.vy || 0) < 0) { R(-7, -19 - bob, 2, 6, P.white); R(-7, -21 - bob, 2, 2, P.skin); R(5, -19 - bob, 2, 6, P.white); R(5, -21 - bob, 2, 2, P.skin); }
   else if (o.toss) { R(4, -14 - bob, 5, 2, P.white); R(9, -14 - bob, 2, 2, P.skin); R(-6, -11 - bob, 2, 4, P.white); }
   else if (o.serve) { R(3, -12 - bob, 6, 2, P.white); R(9, -13 - bob, 2, 2, P.skin); R(-6, -11 - bob, 2, 4, P.white); }
   else { const sw = Math.round(w * 2); R(-7, -11 - bob, 2, 4, P.white); R(-7, -8 - bob + sw, 2, 2, P.skin); R(5, -11 - bob, 2, 4, P.white); R(5, -8 - bob - sw, 2, 2, P.skin); }
@@ -676,11 +690,13 @@ function drawCab(x, y, face, o) { // x = center, y = feet. o: {scale, walk, air,
   R(-5, hy + 1, 1, 2, P.skin2); R(-4, hy + 4, 7, 1, P.skin2);
   if (!o.back) {
     const blink = (Math.floor(frame / 120) % 3 === 0 && frame % 120 < 6);
-    if (o.hurt) { R(0, hy - 2, 2, 1, P.dark); R(3, hy - 2, 2, 1, P.dark); R(1, hy - 1, 1, 1, P.dark); R(4, hy - 1, 1, 1, P.dark); }
+    if (sl) { R(0, hy - 3, 2, 4, P.dark); R(3, hy - 3, 2, 4, P.dark); R(0, hy - 3, 1, 1, '#fff'); R(3, hy - 3, 1, 1, '#fff'); R(-1, hy - 5, 3, 1, P.dark); R(3, hy - 5, 3, 1, P.dark); }
+    else if (o.hurt) { R(0, hy - 2, 2, 1, P.dark); R(3, hy - 2, 2, 1, P.dark); R(1, hy - 1, 1, 1, P.dark); R(4, hy - 1, 1, 1, P.dark); }
     else if (blink) { R(0, hy - 1, 2, 1, P.dark); R(3, hy - 1, 2, 1, P.dark); }
     else { R(0, hy - 2, 2, 3, P.dark); R(3, hy - 2, 2, 3, P.dark); R(0, hy - 2, 1, 1, '#fff'); R(3, hy - 2, 1, 1, '#fff'); }
     R(-1, hy + 1, 2, 1, P.cheek); R(4, hy + 1, 2, 1, P.cheek);
-    if (o.talk && Math.floor(frame / 6) % 2) { R(2, hy + 2, 2, 2, P.dark); }
+    if (sl) { R(1, hy + 2, 3, 3, P.dark); R(2, hy + 3, 1, 1, '#e06a6a'); } // surprised "oh!" mouth
+    else if (o.talk && Math.floor(frame / 6) % 2) { R(2, hy + 2, 2, 2, P.dark); }
     else if (o.hurt) { R(2, hy + 2, 2, 1, P.dark); }
     else { R(1, hy + 2, 3, 1, P.dark); R(0, hy + 1, 1, 1, P.dark); R(4, hy + 1, 1, 1, P.dark); }
   }
@@ -861,7 +877,7 @@ function drawWorld() {
   if (state !== 'dead' || deadT < 40) {
     const c = cab;
     if (!(c.hurt > 0 && frame % 6 < 3 && state === 'play')) {
-      drawCab(c.x, c.y, c.face, { walk: c.anim * 1.4, air: !c.onGround, vy: c.vy, toss: c.tossT > 0, hurt: c.stun > 0 || state === 'dead', joy: state === 'ending', spin: c.slip > 0 ? c.spin : 0 });
+      drawCab(c.x, c.y, c.face, { walk: c.anim * 1.4, air: !c.onGround, vy: c.vy, toss: c.tossT > 0, hurt: c.stun > 0 || state === 'dead', joy: state === 'ending', slip: c.slip > 0 ? TUNE.slipFrames - c.slip + 1 : 0 });
     }
   }
   drawRightWall(); drawBossWall();
@@ -1102,7 +1118,7 @@ window.__game = {
   get slicers() { return slicers; }, get geysers() { return geysers; }, get movers() { return movers; }, get drops() { return drops; },
   get checkpoint() { return checkpoint; }, get camX() { return camX; }, get item() { return item; },
   get LV() { return LV; }, get levelIdx() { return levelIdx; }, get PITS() { return PITS; }, get PLATS() { return PLATS; }, get ARENA() { return ARENA; }, get LEVEL_W() { return LEVEL_W; },
-  input, setInput, step, startLevel, resetRun, loadLevel, TUNE, LEVELS, frame: () => frame,
+  input, setInput, step, draw, startLevel, resetRun, loadLevel, TUNE, LEVELS, frame: () => frame,
   setBossHp(n) { bossHp = n; boss.hp = n; },
 };
 requestAnimationFrame(loop);
