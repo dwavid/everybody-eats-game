@@ -765,7 +765,7 @@ function drawHannah(x, y, face, o) {
 
 // ---- Tommy and Davey share one body; Hannah has her own (long hair, dress)
 const TOMMY = { skin: '#f6cfa8', skin2: '#dca072', hair: '#c8622a', hair2: '#e8843a', shirt: '#ffffff', stripe: '#e0793a', pants: '#3b5fa8', shoe: '#ffffff', cheek: '#ff9a90', dark: '#2a1a22', freckles: true };
-const DAVEY = { skin: '#d9a577', skin2: '#b88255', hair: '#1d1824', hair2: '#3a3048', shirt: '#ffffff', vest: '#f0c040', tie: '#d23a3a', pants: '#a89060', shoe: '#5a3a22', cheek: '#e8887a', dark: '#2a1a22', glasses: '#4a90e8' };
+const DAVEY = { skin: '#d9a577', skin2: '#b88255', hair: '#1d1824', hair2: '#3a3048', shirt: '#ffffff', vest: '#f0c040', tie: '#d23a3a', pants: '#a89060', shoe: '#5a3a22', cheek: '#e8887a', dark: '#2a1a22' };
 function drawPerson(P, x, y, face, o) {
   o = o || {};
   const s = o.scale || 1;
@@ -786,19 +786,10 @@ function drawPerson(P, x, y, face, o) {
     R(-6, hy - 5, 12, 3, P.hair); R(-6, hy - 3, 2, 4, P.hair); R(5, hy - 3, 2, 3, P.hair); R(-5, hy - 6, 10, 2, P.hair2); R(1, hy - 5, 1, 2, P.skin);
   }
   const blink = (Math.floor(frame / 110) % 3 === 2 && frame % 110 < 6);
-  const ex = P.glasses ? -1 : 0; // glasses wearers: eyes sit a pixel left so each one is inside its lens (the head spans x -5..4)
-  if (P.glasses) { // light lenses with small pupils, so the eyes read as eyes behind glass
-    R(ex, hy - 2, 2, 3, '#eef6ff'); R(ex + 3, hy - 2, 2, 3, '#eef6ff');
-    if (blink) { R(ex, hy - 1, 2, 1, P.dark); R(ex + 3, hy - 1, 2, 1, P.dark); }
-    else { R(ex + 1, hy - 2, 1, 3, P.dark); R(ex + 4, hy - 2, 1, 3, P.dark); }
-  }
-  else if (blink) { R(ex, hy - 1, 2, 1, P.dark); R(ex + 3, hy - 1, 2, 1, P.dark); }
-  else { R(ex, hy - 2, 2, 3, P.dark); R(ex + 3, hy - 2, 2, 3, P.dark); R(ex, hy - 2, 1, 1, '#fff'); R(ex + 3, hy - 2, 1, 1, '#fff'); }
-  if (P.glasses) { // thin bright frames: two lenses sharing a bridge, drawn around the eyes (not touching the head's edge)
-    R(-2, hy - 3, 7, 1, P.glasses); R(-2, hy + 1, 7, 1, P.glasses); R(-2, hy - 3, 1, 5, P.glasses); R(1, hy - 3, 1, 5, P.glasses); R(4, hy - 3, 1, 5, P.glasses);
-  }
+  if (blink) { R(0, hy - 1, 2, 1, P.dark); R(3, hy - 1, 2, 1, P.dark); }
+  else { R(0, hy - 2, 2, 3, P.dark); R(3, hy - 2, 2, 3, P.dark); R(0, hy - 2, 1, 1, '#fff'); R(3, hy - 2, 1, 1, '#fff'); }
   if (P.freckles) { R(-1, hy + 1, 1, 1, '#c87a50'); R(1, hy + 2, 1, 1, '#c87a50'); R(5, hy + 1, 1, 1, '#c87a50'); }
-  if (P.glasses) { R(-4, hy + 2, 2, 1, P.cheek); R(3, hy + 2, 2, 1, P.cheek); } else { R(-1, hy + 1, 2, 1, P.cheek); R(4, hy + 1, 2, 1, P.cheek); }
+  R(-1, hy + 1, 2, 1, P.cheek); R(4, hy + 1, 2, 1, P.cheek);
   if (o.talk && Math.floor(frame / 6) % 2) R(1, hy + 2, 4, 3, P.dark); else { R(1, hy + 3, 4, 1, P.dark); R(0, hy + 2, 1, 1, P.dark); R(5, hy + 2, 1, 1, P.dark); }
   if (P.tie) { R(-2, -14, 2, 2, P.tie); R(1, -14, 2, 2, P.tie); R(0, -14, 1, 2, '#8a2020'); }
   ctx.restore();
