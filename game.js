@@ -13,8 +13,8 @@ canvas.width = W * SS; canvas.height = H * SS;
 
 // ---------- Tunables ----------
 const TUNE = {
-  gravity: 0.3, jump: 6.3, maxFall: 7,
-  accel: 0.36, airAccel: 0.26, friction: 0.3, maxSpeed: 1.9,
+  gravity: 0.3, fallGravity: 0.42, jump: 6.3, jumpCut: 1.4, maxFall: 7, // falling is heavier than rising; letting go of jump caps the rise speed at jumpCut
+  accel: 0.36, airAccel: 0.3, airTurn: 0.5, friction: 0.3, airFriction: 0.14, maxSpeed: 1.9,
   coyote: 6, buffer: 6,
   hearts: 3, invuln: 100,
   stompBounce: 4.4, stompBounceHeld: 6.2,
@@ -213,7 +213,7 @@ function loadLevel(i) {
 // ---------- Game state ----------
 let state = 'title'; // title | cutscene | card | play | dead | ending | unlock
 let frame = 0, shake = 0, flash = 0, fade = 0;
-let camX = 0;
+let camX = 0, camFollow = 0;
 let score = 0, hearts = TUNE.hearts, checkpoint = 40;
 let bossHp = TUNE.bossHp;
 const gotCookies = new Set();
@@ -242,7 +242,7 @@ function resetRun(x) {
   ladles = []; thrown = []; particles = []; popups = [];
   item = null;
   boss = { kind: LV.boss, active: false, state: 'sleep', t: 0, x: ARENA.bossX, y: GROUND, vx: 0, vy: 0, face: -1, hp: bossHp, atk: 0, shots: [], waves: [], empty: false, wall: 0, camLock: 0, bubble: '', bubbleT: 0, flash: 0, bannerT: 0 };
-  camX = clamp(x - 120, 0, LEVEL_W - W);
+  camFollow = clamp(x - 120, 0, LEVEL_W - W); camX = Math.round(camFollow);
 }
 function startLevel(i, keepScore) {
   loadLevel(i);
@@ -316,9 +316,10 @@ function updateCab() {
   if (c.slip > 0) {
     c.slip--; c.vx = c.slipDir * T.slipSpeed * (0.55 + 0.45 * (c.slip / T.slipFrames)); c.spin += 0.5;
   } else if (c.stun <= 0) {
-    const a = c.onGround ? T.accel : T.airAccel;
+    const a = c.onGround ? T.accel : (dir && c.vx * dir < 0 ? T.airTurn : T.airAccel); // turning around in the air is quicker
     if (dir) { c.vx += dir * a; c.face = dir; }
     else if (c.onGround) { c.vx = Math.abs(c.vx) < T.friction ? 0 : c.vx - Math.sign(c.vx) * T.friction; }
+    else { c.vx = Math.abs(c.vx) < T.airFriction ? 0 : c.vx - Math.sign(c.vx) * T.airFriction; } // let go of the d-pad in the air and you brake
     c.vx = clamp(c.vx, -T.maxSpeed, T.maxSpeed);
   }
   // jump (coyote time + jump buffering + variable height)
@@ -328,9 +329,9 @@ function updateCab() {
     if (input.down && c.onGround && onOneWay()) { c.dropT = 12; c.onGround = false; c.coyote = 0; c.buf = 0; }
     else { c.vy = -T.jump; c.onGround = false; c.ride = null; c.coyote = 0; c.buf = 0; sfx.jump(); }
   }
-  if (!input.jump && c.vy < -2.4) c.vy *= 0.6;
+  if (!input.jump && c.vy < -T.jumpCut) c.vy = -T.jumpCut; // let go early = short hop
   if (c.dropT > 0) c.dropT--;
-  c.vy = Math.min(c.vy + T.gravity, T.maxFall);
+  c.vy = Math.min(c.vy + (c.vy < 0 ? T.gravity : T.fallGravity), T.maxFall);
 
   // move X (carried along if standing on a boat), then Y, against solids
   if (c.ride) c.x += c.ride.dx;
@@ -527,8 +528,9 @@ function updateLadles() {
 // ---------- Boss engine (what every boss shares; each boss's own moves live in bosses.js) ----------
 function phase() { return TUNE.bossHp - boss.hp; } // 0, 1, 2: he gets meaner as he's hurt
 function say(s, t) { boss.bubble = s; boss.bubbleT = t; }
+const BANNER_FRAMES = 230;
 function startFight() {
-  boss.active = true; boss.state = 'intro'; boss.t = 0; boss.bannerT = 140; say(BOSS.lines.intro, 100);
+  boss.active = true; boss.state = 'intro'; boss.t = 0; boss.bannerT = BANNER_FRAMES; say(BOSS.lines.intro, 100);
   sfx.bossWind();
 }
 function updateBoss() {
@@ -575,8 +577,9 @@ function updateBoss() {
   // touching / stomping him
   const box = (def.box && def.box(b)) || { hw: def.hw, h: def.h };
   const top = b.y - box.h;
+  const head = Math.min(24, Math.round(box.h * 0.45)); // the top of him is his weak spot (and harmless to brush past)
   if (state === 'play' && Math.abs(cab.x - b.x) < box.hw && cab.y > top && cab.y - cab.h < b.y) {
-    if (def.stompable(b) && cab.vy > 0 && cab.y - cab.vy <= top + 9) {
+    if (def.stompable(b) && cab.vy > 0 && cab.y <= top + head) {
       b.hp--; bossHp = b.hp; b.flash = 20; b.t = 0; b.empty = false; sfx.bossHit(); shake = 8;
       cab.vy = -TUNE.stompBounceHeld; cab.onGround = false; cab.hurt = Math.max(cab.hurt, 20);
       burst(b.x, top, 10, def.colors, 2.4);
@@ -584,7 +587,7 @@ function updateBoss() {
       b.shots = []; b.waves = [];
       if (b.hp <= 0) { b.state = 'dying'; say(def.lines.die, 110); }
       else { b.state = 'hurt'; say(def.lines.hit[2 - b.hp] || 'Ow!', 80); }
-    } else if (def.dangerous(b)) hurtCab(b.x);
+    } else if (cab.y > top + head && def.dangerous(b)) hurtCab(b.x);
   }
 }
 
@@ -603,12 +606,18 @@ function updatePlay() {
       state = 'ending'; endT = 0; sfx.win(); burst(item.x, item.y, 20, ['#fff', '#ffe08a', '#ffd93b'], 2.6); item.got = true;
     }
   }
-  // camera
-  let target = cab.x - 130 + cab.face * 22;
-  if (boss.camLock > 0) target = target + (ARENA.left - target) * boss.camLock;
-  target = clamp(target, 0, LEVEL_W - W);
-  camX += (target - camX) * 0.12;
-  if (Math.abs(target - camX) < 0.3) camX = target;
+  updateCamera();
+}
+// The camera follows Cab with a dead zone: it stays put while he's in the middle of the screen and tracks him exactly
+// (no easing) when he leaves it, so he never shimmers on screen. Big jumps (respawns) glide instead. Whole pixels only.
+const CAM_LEFT = 105, CAM_RIGHT = 150;
+function updateCamera() {
+  const sx = cab.x - camFollow;
+  let want = sx < CAM_LEFT ? cab.x - CAM_LEFT : sx > CAM_RIGHT ? cab.x - CAM_RIGHT : camFollow;
+  want = clamp(want, 0, LEVEL_W - W);
+  camFollow = Math.abs(want - camFollow) > 8 ? camFollow + (want - camFollow) * 0.2 : want;
+  const pos = boss.camLock > 0 ? camFollow + (ARENA.left - camFollow) * boss.camLock : camFollow;
+  camX = Math.round(pos);
 }
 function updateParticles() {
   for (const p of particles) { p.x += p.vx; p.y += p.vy; p.vy += p.g; p.life--; }
@@ -840,6 +849,7 @@ function drawWorld() {
   for (const e of enemies) if (Math.abs(e.x - cx - 160) < 200) MINI_ART[e.kind](e);
   if (boss.state !== 'dead') BOSS.draw(boss, boss.active);
   BOSS.drawProj(boss);
+  drawStompCue();
   for (const b of thrown) drawThrown(b.kind, b);
   for (const l of ladles) { ctx.save(); ctx.translate(Math.round(l.x), Math.round(l.y)); ctx.rotate(l.spin); R(-1, -1, 7, 2, '#8a6a4a'); disc(-3, 0, 3, '#c9ced6'); disc(-3, 0, 2, '#9aa0aa'); ctx.restore(); }
   if (item && !item.got) {
@@ -982,16 +992,25 @@ function drawUnlock() {
   }
   if (unlockT > 150 && frame % 40 < 28) txt(IS_TOUCH ? (levelIdx + 1 < LEVELS.length ? 'TAP FOR THE NEXT GUEST' : 'TAP TO CONTINUE') : (levelIdx + 1 < LEVELS.length ? 'PRESS SPACE FOR THE NEXT GUEST' : 'PRESS SPACE TO CONTINUE'), W / 2, 168, 7, '#fff08a', 'center');
 }
+function drawStompCue() { // a bouncing arrow over his head while he's dizzy, so it's obvious what to do
+  if (!boss.active || boss.state !== 'dazed') return;
+  const x = Math.round(boss.x), y = Math.round(boss.y - BOSS.h - 30 + Math.sin(frame * 0.25) * 2);
+  if (frame % 24 < 18) {
+    R(x - 5, y - 1, 11, 1, '#a02020'); for (let i = 0; i < 5; i++) R(x - 4 + i, y + i, 9 - 2 * i, 1, '#ffe14a');
+    R(x - 1, y + 5, 3, 1, '#a02020');
+    txtOutline('STOMP!', x, y - 11, 8, '#fff', '#c33', 'center');
+  }
+}
 function drawPlay() {
   THEME.sky(); THEME.far();
   drawWorld();
   drawHud();
   if (boss.bannerT > 0) {
-    const t = boss.bannerT, a = Math.min(1, t / 20, (140 - t) / 20);
+    const t = boss.bannerT, a = Math.min(1, t / 20, (BANNER_FRAMES - t) / 20);
     ctx.globalAlpha = Math.max(0, a);
-    R(0, 30, W, 28, 'rgba(40,10,60,.75)'); ctx.globalAlpha = Math.max(0, a);
-    txtOutline('BOSS FIGHT', W / 2, 33, 8, '#ffd1ff', '#3a1050', 'center');
-    txtOutline(BOSS.name, W / 2, 43, 13, '#ffd93b', '#5a2a12', 'center');
+    R(0, 28, W, 31, 'rgba(40,10,60,.75)'); ctx.globalAlpha = Math.max(0, a);
+    txtOutline(BOSS.name, W / 2, 31, 13, '#ffd93b', '#5a2a12', 'center');
+    txtOutline(BOSS.tip, W / 2, 48, 7, '#fff', '#3a1050', 'center');
     ctx.globalAlpha = 1;
   }
   if (state === 'ending') { ctx.fillStyle = 'rgba(255,255,255,' + clamp((endT - 30) / 40, 0, 1) + ')'; ctx.fillRect(0, 0, W, H); }
@@ -1052,8 +1071,10 @@ function step() {
 }
 let acc = 0, last = performance.now();
 function loop(now) {
-  acc += Math.min(100, now - last); last = now;
-  while (acc >= 1000 / 60) { step(); acc -= 1000 / 60; }
+  let dt = Math.min(100, now - last); last = now;
+  for (const hz of [30, 60, 120]) { const t = 1000 / hz; if (Math.abs(dt - t) < 1.3) { dt = t; break; } } // snap to the display's refresh so the 60Hz steps stay evenly spaced
+  acc += dt;
+  while (acc >= 1000 / 60 - 0.01) { step(); acc -= 1000 / 60; }
   draw();
   requestAnimationFrame(loop);
 }

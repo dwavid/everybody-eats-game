@@ -34,6 +34,7 @@ const BOSSES = {};
 // ================================================================ 1. Baron Von Peel (banana)
 BOSSES.peel = {
   name: 'BARON VON PEEL',
+  tip: 'Jump his peels. When he is dizzy, jump on his head!',
   lines: { intro: 'Nobody eats ME, chef!', hit: ["Ow! That's bananas!", "Now I'm MAD!"], die: "Ugh... I'm... a-PEEL-ing..." },
   colors: ['#ffd93b', '#ffe97a', '#c99a14'],
   h: 52, hw: 17, dazed: 140,
@@ -129,6 +130,7 @@ BOSSES.peel = {
 // across the arena like a wheel. When he smacks the wall he's dizzy and you can stomp his cap.
 BOSSES.salami = {
   name: 'GENERAL SALAMI',
+  tip: 'Jump his slices and rolls. When he is dizzy, stomp his cap!',
   lines: { intro: 'Halt! Nobody slices the General!', hit: ['Ow! Watch the casing!', "Now I'm SALAMI-ing mad!"], die: "I've been... cut... down to size..." },
   colors: ['#c0443a', '#f3cdbd', '#7e2420'],
   h: 54, hw: 15, dazed: 130,
@@ -252,6 +254,7 @@ BOSSES.salami = {
 // jump early. After pouring he's empty and dizzy: stomp his cap.
 BOSSES.gravy = {
   name: 'CAPTAIN GRAVY',
+  tip: 'Jump his waves. When he is empty and dizzy, stomp his cap!',
   lines: { intro: 'All aboard the gravy train!', hit: ['Gurgle! Steady as she goes!', 'Man overboard!'], die: "I'm... all out of... gravy..." },
   colors: ['#6b3a14', '#b0702a', '#ffffff'],
   h: 44, hw: 20, dazed: 130,
